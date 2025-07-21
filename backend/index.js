@@ -3,13 +3,17 @@
 require('dotenv').config(); // This line loads the .env file variables
 const express = require('express');
 
-const { getSongsRecommendations } = require('./src/services/openaiServices');
+const { getSongsRecommendations } = require('./src/services/openaiService');
+
+const authRoutes = require('./src/services/routes/authRoutes');
 
 // initializing express app
 const app = express();
 const port = process.env.PORT || 5001;
 
 app.use(express.json()); // Middleware to parse JSON bodies
+
+app.use('/api/auth', authRoutes); // Use the auth routes
 
 app.post('/api/test-openai', async (req, res) => {
   try {
