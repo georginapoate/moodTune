@@ -1,70 +1,78 @@
-# Getting Started with Create React App
+# MoodTunes 🎵
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A full-stack web application that generates a custom Spotify playlist based on a creative text prompt, like "a rainy afternoon in a cozy coffee shop."
 
-## Available Scripts
+## Tech Stack
 
-In the project directory, you can run:
+*   **Frontend:** React
+*   **Backend:** Node.js, Express.js
+*   **APIs:**
+    *   OpenAI API (GPT-3.5-Turbo) for song suggestion
+    *   Spotify Web API for authentication and playlist creation
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## How It Works
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1.  User authenticates with their Spotify account via OAuth 2.0.
+2.  User submits a text prompt from the React frontend.
+3.  The Node.js backend sends the prompt to the OpenAI API to generate a list of suitable songs (artist and title).
+4.  The backend searches for each of these songs on Spotify to find their unique Track IDs.
+5.  The backend creates a new, private Spotify playlist for the user and adds all the found tracks.
+6.  The URL for the new playlist is returned to the frontend for the user to enjoy.
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Setup and Installation
 
-### `npm run build`
+### Prerequisites
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+*   Node.js and npm (or yarn)
+*   Git
+*   API keys for OpenAI and Spotify Developer
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Installation
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repo-url>
+    cd moodtunes
+    ```
 
-### `npm run eject`
+2.  **Backend Setup:**
+    ```bash
+    cd backend
+    npm install
+    ```
+    Create a `.env` file in the `backend` directory and add your secret keys:
+    ```
+    PORT=5001
+    OPENAI_API_KEY="your_openai_key"
+    SPOTIFY_CLIENT_ID="your_spotify_client_id"
+    SPOTIFY_CLIENT_SECRET="your_spotify_client_secret"
+    SPOTIFY_CALLBACK_URL="http://localhost:5001/api/auth/callback"
+    ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+3.  **Frontend Setup:**
+    ```bash
+    cd ../frontend
+    npm install
+    ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Running the Application
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+You will need two separate terminal windows.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1.  **Run the Backend Server:**
+    ```bash
+    # In terminal 1, from the /backend directory
+    npm run dev
+    ```
 
-## Learn More
+2.  **Run the Frontend App:**
+    ```bash
+    # In terminal 2, from the /frontend directory
+    npm start
+    ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The application will be available at `http://localhost:3000`.
