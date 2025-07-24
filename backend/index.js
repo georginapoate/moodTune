@@ -5,7 +5,7 @@ const express = require('express');
 
 const { getSongsRecommendations } = require('./src/services/openaiService');
 
-const authRoutes = require('./src/services/routes/authRoutes');
+const authRoutes = require('./src/routes/authRoutes');
 
 // initializing express app
 const app = express();
