@@ -56,4 +56,25 @@ async function getSongsRecommendations(prompt) {
   }
 }
 
-module.exports = { getSongsRecommendations };
+/**
+ * NEW: Creates a vector embedding from a piece of text.
+ * @param {string} text The text to embed.
+ * @returns {Promise<Array<number>>} A promise that resolves to the embedding vector.
+ */
+async function getOpenAIEmbedding(text) {
+  try {
+    const response = await openai.embeddings.create({
+      // This is the new, recommended, and cheaper model for embeddings
+      model: "text-embedding-3-small", 
+      input: text,
+    });
+    // The vector is located in response.data[0].embedding
+    return response.data[0].embedding;
+  } catch (error) {
+    console.error("! Error getting OpenAI embedding:", error);
+    return null;
+  }
+}
+
+
+module.exports = { getOpenAIEmbedding, getSongsRecommendations };

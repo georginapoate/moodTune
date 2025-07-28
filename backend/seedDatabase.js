@@ -9,6 +9,7 @@ const SEED_SONGS = [
     { artist: 'Kendrick Lamar', title: 'Money Trees', album: 'good kid, m.A.A.d city' },
     { artist: 'The Strokes', title: 'Last Nite', album: 'Is This It' },
     { artist: 'Daft Punk', title: 'One More Time', album: 'Discovery' },
+    { artist: 'Wednesday', title: 'Pick Up That Knife'},
 ];
 
 /**
@@ -80,46 +81,120 @@ async function getPitchforkReview(artist, title, album) {
   }
 }
 
+async function getGeniusData(artist, title) {
+  try {
+    const formatForUrl = (str) =>
+      str
+        .toLowerCase()
+        .replace(/&/g, 'and') // Handle ampersands
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+
+    const formattedArtist = formatForUrl(artist);
+    const formattedTitle = formatForUrl(title);
+    const songUrl = `https://genius.com/${formattedArtist}-${formattedTitle}-lyrics`;
+
+    console.log(`  > Attempting to scrape Genius: ${songUrl}`);
+    const response = await axios.get(songUrl);
+    const $ = cheerio.load(response.data);
+
+    // --- Scrape Lyrics ---
+    $('div[data-lyrics-container="true"]').find('br').replaceWith('\n');
+    const lyrics = $('div[data-lyrics-container="true"]').text().trim();
+
+    // --- Scrape "About" Section ---
+    // The 'About' content is in a div with a specific class structure.
+    const aboutText = $('div[class^="SongDescription__Content"]').text().trim();
+    
+    console.log(`  > Successfully scraped data from Genius (Lyrics: ${lyrics.length > 0}, About: ${aboutText.length > 0}).`);
+
+    return { lyrics, aboutText };
+
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      console.log(`  > Genius page not found for ${artist} - ${title}.`);
+    } else {
+      console.error(`! An error occurred scraping Genius:`, error.message);
+    }
+    return { lyrics: '', aboutText: '' }; // Return empty object on failure
+  }
+}
+
 async function main() {
     console.log('--- Starting Definitive Data Seeding Process ---');
     const allSongData = [];
 
-    for (const song of SEED_SONGS) {
-        console.log(`\nProcessing: ${song.artist} - ${song.title}`);
+    const client = new MongoClient(process.env.MONGODB_URI);
+    try {
+      await client.connect();
+      console.log('Connected to MongoDB');
+      const db = client.db('moodtunes');
+      const collection = db.collection('songs');
+      console.log('Connected to the songs collection in MongoDB');
+      
+      await collection.deleteMany({});
+      console.log('> Cleared existing songs from the collection.');
 
-        // Get Last.fm data
-        const lastFmData = await getLastFmData(song.artist, song.title);
 
-        // --- THIS IS THE FIX ---
-        // Call the scraper with all three correct arguments
-        const pitchforkReview = await getPitchforkReview(song.artist, song.title, song.album);
+      for (const song of SEED_SONGS) {
+          console.log(`\nProcessing: ${song.artist} - ${song.title}`);
+  
+          // Get Last.fm data
+          const lastFmData = await getLastFmData(song.artist, song.title);
+  
+          // Call the scraper with all three correct arguments
+          const pitchforkReview = await getPitchforkReview(song.artist, song.title, song.album);
+          
+          // getting the genius data
+          const genius = await getGeniusData(song.artist, song.title); 
+  
+          // Combine all data
+          const combinedText = `
+            Title: ${song.title};
+            Artist: ${song.artist};
+            Album: ${song.album};
+            Tags: ${lastFmData.tags.join(', ')};
+            Summary: ${lastFmData.summary};
+            Review: ${pitchforkReview};
+            About: ${genius.aboutText};
+            Lyrics: ${genius.lyrics};
+          `.replace(/\s+/g, ' ').trim();
+  
         
-        // Combine all data
-        const combinedText = `
-          Title: ${song.title};
-          Artist: ${song.artist};
-          Album: ${song.album};
-          Tags: ${lastFmData.tags.join(', ')};
-          Summary: ${lastFmData.summary};
-          Review: ${pitchforkReview}
-        `.replace(/\s+/g, ' ').trim();
+          console.log("--- COMBINED DATA PREVIEW ---");
+          console.log(songEntry.sourceText.substring(0, 500) + '...');
+          console.log("----------------------------");
+          
+          const embedding = await getOpenAIEmbedding(combinedText);
 
-        // Prepare entry for database
-        const songEntry = {
-          artist: song.artist,
-          title: song.title,
-          album: song.album,
-          sourceText: combinedText,
-        };
+          if (!embedding) {
+                console.log(`! Failed to generate embedding for ${song.title}. Skipping.`);
+                continue; // Skip to the next song if embedding fails
+            }
+            console.log(`  > Embedding generated successfully (Vector size: ${embedding.length}).`);
 
-        console.log("--- COMBINED DATA PREVIEW ---");
-        console.log(songEntry.sourceText.substring(0, 500) + '...');
-        console.log("----------------------------");
+          // Prepare entry for database
+          const songDocument = {
+            artist: song.artist,
+            title: song.title,
+            album: song.album,
+            sourceText: combinedText,
+          };
 
-        allSongData.push(songEntry);
+          await collection.insertOne(songDocument);
+            console.log(`  > Successfully saved "${song.title}" to the database.`);
+      }
+    
+    } catch (error) {
+        console.error('An error occurred during the seeding process:', error);
+    } finally {
+        // --- Step 5: Ensure the database connection is closed ---
+        await client.close();
+        console.log('\n> Disconnected from MongoDB.');
+        console.log('--- Seeding Process Finished ---');
     }
-    console.log('\n--- Data Seeding Process Finished ---');
-    console.log('Next step is finally here: Generate embeddings and save to MongoDB.');
+
 }
 
 main();
