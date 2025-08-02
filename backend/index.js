@@ -14,6 +14,7 @@ const port = process.env.PORT || 5001;
 app.use(express.json()); // Middleware to parse JSON bodies
 
 app.use('/api/auth', authRoutes); // Use the auth routes
+// app.use('/', );
 
 app.post('/api/test-openai', async (req, res) => {
   try {

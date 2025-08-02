@@ -3,13 +3,16 @@ require('dotenv').config();
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { getLastFmData } = require('./src/services/lastfmService');
+const { getOpenAIEmbedding } = require('./src/services/openaiService');
+const { MongoClient } = require('mongodb');
+
 
 const SEED_SONGS = [
     { artist: 'Fleetwood Mac', title: 'Dreams', album: 'Rumours' },
     { artist: 'Kendrick Lamar', title: 'Money Trees', album: 'good kid, m.A.A.d city' },
     { artist: 'The Strokes', title: 'Last Nite', album: 'Is This It' },
     { artist: 'Daft Punk', title: 'One More Time', album: 'Discovery' },
-    { artist: 'Wednesday', title: 'Pick Up That Knife'},
+    { artist: 'Wednesday', title: 'Pick Up That Knife', album: 'Rat Saw God' },
 ];
 
 /**
@@ -80,7 +83,6 @@ async function getPitchforkReview(artist, title, album) {
     return '';
   }
 }
-
 async function getGeniusData(artist, title) {
   try {
     const formatForUrl = (str) =>
@@ -123,9 +125,9 @@ async function getGeniusData(artist, title) {
 
 async function main() {
     console.log('--- Starting Definitive Data Seeding Process ---');
-    const allSongData = [];
 
-    const client = new MongoClient(process.env.MONGODB_URI);
+    const client = new MongoClient(process.env.MONGO_URI);
+
     try {
       await client.connect();
       console.log('Connected to MongoDB');
@@ -147,7 +149,7 @@ async function main() {
           const pitchforkReview = await getPitchforkReview(song.artist, song.title, song.album);
           
           // getting the genius data
-          const genius = await getGeniusData(song.artist, song.title); 
+          const geniusData  = await getGeniusData(song.artist, song.title); 
   
           // Combine all data
           const combinedText = `
@@ -157,15 +159,16 @@ async function main() {
             Tags: ${lastFmData.tags.join(', ')};
             Summary: ${lastFmData.summary};
             Review: ${pitchforkReview};
-            About: ${genius.aboutText};
-            Lyrics: ${genius.lyrics};
+            About: ${geniusData .aboutText};
+            Lyrics: ${geniusData .lyrics};
           `.replace(/\s+/g, ' ').trim();
   
         
           console.log("--- COMBINED DATA PREVIEW ---");
-          console.log(songEntry.sourceText.substring(0, 500) + '...');
+          console.log(combinedText.substring(0, 500) + '...');
           console.log("----------------------------");
           
+          console.log('  > Generating OpenAI embedding...');
           const embedding = await getOpenAIEmbedding(combinedText);
 
           if (!embedding) {
@@ -173,13 +176,19 @@ async function main() {
                 continue; // Skip to the next song if embedding fails
             }
             console.log(`  > Embedding generated successfully (Vector size: ${embedding.length}).`);
-
+            // snippet of embedding for debugging
+            console.log(`  > Embedding preview: ${embedding.slice(0, 5).join(', ')}...`);
+            
           // Prepare entry for database
           const songDocument = {
             artist: song.artist,
             title: song.title,
             album: song.album,
             sourceText: combinedText,
+            embedding: embedding,
+            lastFmTags: lastFmData.tags,
+            lastFmSummary: lastFmData.summary,
+            pitchforkReview: pitchforkReview,
           };
 
           await collection.insertOne(songDocument);
