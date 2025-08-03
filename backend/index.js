@@ -6,6 +6,7 @@ const express = require('express');
 const { getSongsRecommendations } = require('./src/services/openaiService');
 
 const authRoutes = require('./src/routes/authRoutes');
+const playlistRoutes = require('./src/routes/playlistRoutes');
 
 // initializing express app
 const app = express();
@@ -16,26 +17,7 @@ app.use(express.json()); // Middleware to parse JSON bodies
 app.use('/api/auth', authRoutes); // Use the auth routes
 // app.use('/', );
 
-app.post('/api/test-openai', async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
-    const songs = await getSongsRecommendations(prompt);
-    
-    if (!songs || songs.length === 0) {
-      return res.status(404).json({ error: 'No songs found' });
-    }
-    res.json(songs);
-  }
-  catch (error) {
-    console.error('Error in /api/test-openai:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-
+app.use('/api/playlist', playlistRoutes); // Use the playlist routes
 
 // simple route to test the server
 app.get('/', (req, res) => {
