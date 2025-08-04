@@ -1,0 +1,92 @@
+/* frontend/src/components/MainInterface.css */
+
+.main-interface-container {
+  width: 100%;
+  max-width: 600px; /* Constrain the width for better readability */
+  padding: 20px;
+}
+
+/* Styles for the PlaylistGenerator component's elements */
+.generator-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.generator-container textarea {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 15px;
+  font-size: 1.1rem;
+  color: white;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.generator-container textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.generator-container textarea:focus {
+  outline: none;
+  border-color: #1DB954; /* Spotify Green */
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.5);
+}
+
+.generator-container button[type="submit"] {
+  background-color: #1DB954;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 50px;
+  padding: 15px 30px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.generator-container button[type="submit"]:hover {
+  background-color: #1ed760;
+  transform: scale(1.03);
+}
+
+.generator-container button[type="submit"]:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Styles for the result messages */
+.result-success, .result-error {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+}
+
+.result-success h3 {
+    margin-top: 0;
+    color: #1DB954;
+}
+
+.result-success a {
+  display: inline-block;
+  background-color: white;
+  color: #111;
+  padding: 10px 20px;
+  border-radius: 50px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: transform 0.2s ease;
+}
+
+.result-success a:hover {
+    transform: scale(1.05);
+}
+
+.result-error {
+    color: #ff4d4d;
+    font-weight: bold;
+}

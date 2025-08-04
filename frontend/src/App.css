@@ -1,0 +1,87 @@
+/* frontend/src/App.css (adăugă sau modifică aceste stiluri) */
+.App {
+  text-align: center;
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  transition: filter 0.3s ease-in-out;
+}
+
+.main-content-container.blurred {
+    filter: blur(8px);
+}
+
+.main-content-container {
+    transition: filter 0.3s ease-in-out;
+}
+
+.background-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #ff0055, #6a0dad, #002366);
+    z-index: -1;
+}
+
+.logo-corner {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background-color: #4a4e58;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.App-header {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.landing-container h1 {
+    font-size: 4rem;
+    margin-bottom: 10px;
+}
+
+.landing-container p {
+    font-size: 1.2rem;
+    color: #e0e0e0;
+    margin-bottom: 30px;
+}
+
+.login-prompt-button {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 12px 30px;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.login-prompt-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.arrow {
+    margin-left: 10px;
+}
+
+/* Asigură-te că stilurile pentru PlaylistGenerator arată bine pe acest fundal */
+.generator-container {
+    /* adaugă stiluri aici dacă este necesar */
+}
