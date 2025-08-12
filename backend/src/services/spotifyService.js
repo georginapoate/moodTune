@@ -41,7 +41,7 @@ const createPlaylistFromTracks = async (accessToken, recommendedSongs, prompt) =
 
   console.log('Spotify Service: Creating the Spotify playlist...');
   const trackUris = [];
-  
+
   for (const song of recommendedSongs) {
     if (song.spotifyUri) {
       trackUris.push(song.spotifyUri);
@@ -96,5 +96,6 @@ const deletePlaylist = async (accessToken, playlistId) => {
 
 module.exports = {
   createPlaylistFromTracks,
+  searchTrackOnSpotify,
   deletePlaylist,
 };

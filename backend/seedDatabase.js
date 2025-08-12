@@ -4,8 +4,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { getLastFmData } = require('./src/services/lastfmService');
 const { getOpenAIEmbedding } = require('./src/services/openaiService');
-const { MongoClient } = require('mongodb');
-
+const { seedSongsCollection, closeDbConnection } = require('../services/dbService');
 
 const SEED_SONGS = [
   { artist: 'Queen', title: 'Bohemian Rhapsody', album: 'A Night at the Opera' },
@@ -112,36 +111,36 @@ async function getPitchforkReview(artist, title, album) {
     const trackSearchResponse = await axios.get(trackSearchUrl);
     const $trackSearch = cheerio.load(trackSearchResponse.data);
     const trackReviewUrl = $trackSearch('a[href*="/reviews/tracks/"]').first().attr('href');
-    
+
     if (trackReviewUrl) {
-        reviewUrl = trackReviewUrl;
+      reviewUrl = trackReviewUrl;
     } else {
-        // --- STRATEGY 2: If no track review, use the album workflow. ---
-        console.log(`  > No track review found. Searching for album '${album}' on artist's page...`);
-        
-        // Step 2a: Find the main artist page.
-        const artistSearchUrl = `https://pitchfork.com/search/?query=${encodeURIComponent(artist)}`;
-        const artistSearchResponse = await axios.get(artistSearchUrl);
-        const $artistSearch = cheerio.load(artistSearchResponse.data);
-        const artistPageUrl = $artistSearch('a[href^="/artists/"]').first().attr('href');
+      // --- STRATEGY 2: If no track review, use the album workflow. ---
+      console.log(`  > No track review found. Searching for album '${album}' on artist's page...`);
 
-        if (!artistPageUrl) {
-            console.log(`  > Could not find an artist page link for '${artist}'.`);
-            return '';
+      // Step 2a: Find the main artist page.
+      const artistSearchUrl = `https://pitchfork.com/search/?query=${encodeURIComponent(artist)}`;
+      const artistSearchResponse = await axios.get(artistSearchUrl);
+      const $artistSearch = cheerio.load(artistSearchResponse.data);
+      const artistPageUrl = $artistSearch('a[href^="/artists/"]').first().attr('href');
+
+      if (!artistPageUrl) {
+        console.log(`  > Could not find an artist page link for '${artist}'.`);
+        return '';
+      }
+
+      // Step 2b: Go to the artist page and find the album link.
+      const fullArtistPageUrl = `https://pitchfork.com${artistPageUrl}`;
+      const artistPageResponse = await axios.get(fullArtistPageUrl);
+      const $artistPage = cheerio.load(artistPageResponse.data);
+
+      $artistPage('div.review').each((i, el) => {
+        const albumTitle = $artistPage(el).find('h2.review__title').text().trim();
+        if (albumTitle.toLowerCase() === album.toLowerCase()) {
+          reviewUrl = $artistPage(el).find('a.review__link').attr('href');
+          return false; // Stop the loop
         }
-
-        // Step 2b: Go to the artist page and find the album link.
-        const fullArtistPageUrl = `https://pitchfork.com${artistPageUrl}`;
-        const artistPageResponse = await axios.get(fullArtistPageUrl);
-        const $artistPage = cheerio.load(artistPageResponse.data);
-
-        $artistPage('div.review').each((i, el) => {
-            const albumTitle = $artistPage(el).find('h2.review__title').text().trim();
-            if (albumTitle.toLowerCase() === album.toLowerCase()) {
-                reviewUrl = $artistPage(el).find('a.review__link').attr('href');
-                return false; // Stop the loop
-            }
-        });
+      });
     }
 
     if (!reviewUrl) {
@@ -155,7 +154,7 @@ async function getPitchforkReview(artist, title, album) {
     const reviewPage = await axios.get(fullReviewUrl);
     const $review = cheerio.load(reviewPage.data);
     const reviewText = $review('div.body__inner-container').text().trim();
-    
+
     console.log(`  > Successfully scraped review content.`);
     return reviewText;
 
@@ -189,7 +188,7 @@ async function getGeniusData(artist, title) {
     // --- Scrape "About" Section ---
     // The 'About' content is in a div with a specific class structure.
     const aboutText = $('div[class^="SongDescription__Content"]').text().trim();
-    
+
     console.log(`  > Successfully scraped data from Genius (Lyrics: ${lyrics.length > 0}, About: ${aboutText.length > 0}).`);
 
     return { lyrics, aboutText };
@@ -205,85 +204,72 @@ async function getGeniusData(artist, title) {
 }
 
 async function main() {
-    console.log('--- Starting Definitive Data Seeding Process ---');
+  console.log('--- Starting Definitive Data Seeding Process ---');
 
-    const client = new MongoClient(process.env.MONGO_URI);
+  try {
+    for (const song of SEED_SONGS) {
+      console.log(`\nProcessing: ${song.artist} - ${song.title}`);
 
-    try {
-      await client.connect();
-      console.log('Connected to MongoDB');
-      const db = client.db('moodtunes');
-      const collection = db.collection('songs');
-      console.log('Connected to the songs collection in MongoDB');
-      
-      await collection.deleteMany({});
-      console.log('> Cleared existing songs from the collection.');
+      // Get Last.fm data
+      const lastFmData = await getLastFmData(song.artist, song.title);
 
+      // Call the scraper with all three correct arguments
+      const pitchforkReview = await getPitchforkReview(song.artist, song.title, song.album);
 
-      for (const song of SEED_SONGS) {
-          console.log(`\nProcessing: ${song.artist} - ${song.title}`);
-  
-          // Get Last.fm data
-          const lastFmData = await getLastFmData(song.artist, song.title);
-  
-          // Call the scraper with all three correct arguments
-          const pitchforkReview = await getPitchforkReview(song.artist, song.title, song.album);
-          
-          // getting the genius data
-          const geniusData  = await getGeniusData(song.artist, song.title); 
-  
-          // Combine all data
-          const combinedText = `
+      // getting the genius data
+      const geniusData = await getGeniusData(song.artist, song.title);
+
+      // Combine all data
+      const combinedText = `
             Title: ${song.title};
             Artist: ${song.artist};
             Album: ${song.album};
             Tags: ${lastFmData.tags.join(', ')};
             Summary: ${lastFmData.summary};
             Review: ${pitchforkReview};
-            About: ${geniusData .aboutText};
-            Lyrics: ${geniusData .lyrics};
+            About: ${geniusData.aboutText};
+            Lyrics: ${geniusData.lyrics};
           `.replace(/\s+/g, ' ').trim();
-  
-        
-          console.log("--- COMBINED DATA PREVIEW ---");
-          console.log(combinedText.substring(0, 500) + '...');
-          console.log("----------------------------");
-          
-          console.log('  > Generating OpenAI embedding...');
-          const embedding = await getOpenAIEmbedding(combinedText);
 
-          if (!embedding) {
-                console.log(`! Failed to generate embedding for ${song.title}. Skipping.`);
-                continue; // Skip to the next song if embedding fails
-            }
-            console.log(`  > Embedding generated successfully (Vector size: ${embedding.length}).`);
-            // snippet of embedding for debugging
-            console.log(`  > Embedding preview: ${embedding.slice(0, 5).join(', ')}...`);
-            
-          // Prepare entry for database
-          const songDocument = {
-            artist: song.artist,
-            title: song.title,
-            album: song.album,
-            sourceText: combinedText,
-            embedding: embedding,
-            lastFmTags: lastFmData.tags,
-            lastFmSummary: lastFmData.summary,
-            pitchforkReview: pitchforkReview,
-          };
 
-          await collection.insertOne(songDocument);
-            console.log(`  > Successfully saved "${song.title}" to the database.`);
+      console.log("--- COMBINED DATA PREVIEW ---");
+      console.log(combinedText.substring(0, 500) + '...');
+      console.log("----------------------------");
+
+      console.log('  > Generating OpenAI embedding...');
+      const embedding = await getOpenAIEmbedding(combinedText);
+
+      if (!embedding) {
+        console.log(`! Failed to generate embedding for ${song.title}. Skipping.`);
+        continue; // Skip to the next song if embedding fails
       }
-    
-    } catch (error) {
-        console.error('An error occurred during the seeding process:', error);
-    } finally {
-        // --- Step 5: Ensure the database connection is closed ---
-        await client.close();
-        console.log('\n> Disconnected from MongoDB.');
-        console.log('--- Seeding Process Finished ---');
+      console.log(`  > Embedding generated successfully (Vector size: ${embedding.length}).`);
+      // snippet of embedding for debugging
+      console.log(`  > Embedding preview: ${embedding.slice(0, 5).join(', ')}...`);
+
+      // Prepare entry for database
+      const songDocument = {
+        artist: song.artist,
+        title: song.title,
+        album: song.album,
+        sourceText: combinedText,
+        embedding: embedding,
+        lastFmTags: lastFmData.tags,
+        lastFmSummary: lastFmData.summary,
+        pitchforkReview: pitchforkReview,
+      };
+
+      if (songDocuments.length > 0) {
+        await seedSongsCollection(songDocuments);
+      }
     }
+
+  } catch (error) {
+    console.error('An error occurred during the seeding process:', error);
+  } finally {
+    await closeDbConnection();
+    console.log('--- Seeding Process Finished ---');
+  }
 
 }
 
