@@ -1,6 +1,7 @@
 // backend/controllers/playlistController.js
 const { searchTrackOnSpotify, createPlaylistFromTracks, deletePlaylist } = require('../services/spotifyService');
 const { findSimilarSongs } = require('../services/dbService');
+const { getOpenAIEmbedding } = require('../services/openaiService');
 
 
 const generatePlaylist = async (req, res) => {
@@ -11,6 +12,9 @@ const generatePlaylist = async (req, res) => {
     }
 
     try {
+        console.log("1. Generating embedding for prompt...");
+        const promptEmbedding = await getOpenAIEmbedding(prompt);
+
         const recommendedSongs = await findSimilarSongs(promptEmbedding);
 
         if (recommendedSongs.length === 0) {
@@ -19,6 +23,8 @@ const generatePlaylist = async (req, res) => {
         console.log(`2. Found ${recommendedSongs.length} recommended songs.`);
 
         const results = [];
+
+        console.log(`3. Fetching Spotify metadata for each song...`);
 
         for (const doc of recommendedSongs) {
             const spotifyMeta = await searchTrackOnSpotify(accessToken, doc.artist, doc.title);
@@ -30,11 +36,11 @@ const generatePlaylist = async (req, res) => {
                 spotifyTrackId: spotifyMeta?.spotifyTrackId || null,
                 spotifyUri: spotifyMeta?.spotifyUri || null,
                 previewUrl: spotifyMeta?.previewUrl || null,
-                albumImage: spotifyMeta?.albumImage || null,
+                albumImage: spotifyMeta?.albumImage || 'https://picsum.photos/200',
                 spotifyExternalUrl: spotifyMeta?.spotifyExternalUrl || null,
             });
         }
-
+        console.log(`4. Returning ${results.length} songs to frontend.`);
         return res.json({ songs: results, prompt });
 
     } catch (error) {
@@ -43,12 +49,10 @@ const generatePlaylist = async (req, res) => {
             return res.status(401).json({ error: 'Spotify token expired.' });
         }
         res.status(500).json({ error: 'Failed to generate playlist.' });
-    } finally {
-        await client.close();
     }
 };
 
-const savePlaylist = async (req, res) => {
+const createSpotifyPlaylist = async (req, res) => {
     const { accessToken, songs, prompt } = req.body;
     if (!accessToken || !songs || !prompt) {
         return res.status(400).json({ error: 'Token, songs, and prompt are required.' });
@@ -87,6 +91,6 @@ const deleteGeneratedPlaylist = async (req, res) => {
 
 module.exports = {
     generatePlaylist,
-    savePlaylist,
+    savePlaylist: createSpotifyPlaylist,
     deleteGeneratedPlaylist
 };

@@ -8,6 +8,9 @@ import MainInterface from './components/MainInterface';
 function App() {
   const [accessToken, setAccessToken] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [audio, setAudio] = useState(null);
+  const [currentPlayingUrl, setCurrentPlayingUrl] = useState(null);
+
 
   // This useEffect logic is correct and does not need to change.
   useEffect(() => {
@@ -23,7 +26,30 @@ function App() {
         setAccessToken(tokenFromStorage);
       }
     }
+
+    const audioInstance = new Audio();
+    audioInstance.addEventListener('ended', () => setCurrentPlayingUrl(null)); // Reset on song end
+    setAudio(audioInstance);
+
+    return () => {
+      // Cleanup on component unmount
+      audioInstance.pause();
+      audioInstance.removeEventListener('ended', () => setCurrentPlayingUrl(null));
+    };
   }, []);
+
+   const handlePlayPause = (previewUrl) => {
+    if (currentPlayingUrl === previewUrl) {
+      // It's the current song, so pause it
+      audio.pause();
+      setCurrentPlayingUrl(null);
+    } else {
+      // It's a new song
+      audio.src = previewUrl;
+      audio.play();
+      setCurrentPlayingUrl(previewUrl);
+    }
+  };
 
   const handleLogin = () => {
     window.location.href = 'http://127.0.0.1:5001/api/auth/login';
@@ -41,7 +67,11 @@ function App() {
           <div className="logo-corner">G</div>
           
           {accessToken ? (
-            <MainInterface accessToken={accessToken} />
+            <MainInterface
+              accessToken={accessToken}
+              currentPlayingUrl={currentPlayingUrl}
+              onPlayPause={handlePlayPause}
+            />
           ) : (
             <LandingPage onLoginClick={() => setShowLoginModal(true)} />
           )}
