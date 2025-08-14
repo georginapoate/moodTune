@@ -1,6 +1,6 @@
 // frontend/src/App.js
 import './App.css';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LandingPage from './components/LandingPage';
 import LoginModal from './components/LoginModal';
 import MainInterface from './components/MainInterface';
@@ -8,10 +8,43 @@ import MainInterface from './components/MainInterface';
 function App() {
   const [accessToken, setAccessToken] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [audio, setAudio] = useState(null);
   const [currentPlayingUrl, setCurrentPlayingUrl] = useState(null);
 
+  const audioRef = useRef(null);
 
+
+  useEffect(() => {
+    // 3. Create the instance and store it in the ref's .current property
+    audioRef.current = new Audio();
+    
+    const audio = audioRef.current; // for cleanup
+    
+    const handleSongEnd = () => setCurrentPlayingUrl(null);
+    audio.addEventListener('ended', handleSongEnd);
+
+    // Cleanup function to run when the App component unmounts
+    return () => {
+      audio.pause();
+      audio.removeEventListener('ended', handleSongEnd);
+    };
+  }, []);
+
+   useEffect(() => {
+    const audio = audioRef.current;
+    if (currentPlayingUrl) {
+      if (audio.src !== currentPlayingUrl) {
+        audio.src = currentPlayingUrl;
+      }
+      audio.play().catch(e => console.error("Audio playback failed:", e));
+    } else {
+      audio.pause();
+    }
+  }, [currentPlayingUrl]);
+
+  const handlePlayPause = (previewUrl) => {
+   setCurrentPlayingUrl(prevUrl => (prevUrl === previewUrl ? null : previewUrl));
+ };
+ 
   // This useEffect logic is correct and does not need to change.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -26,30 +59,8 @@ function App() {
         setAccessToken(tokenFromStorage);
       }
     }
-
-    const audioInstance = new Audio();
-    audioInstance.addEventListener('ended', () => setCurrentPlayingUrl(null)); // Reset on song end
-    setAudio(audioInstance);
-
-    return () => {
-      // Cleanup on component unmount
-      audioInstance.pause();
-      audioInstance.removeEventListener('ended', () => setCurrentPlayingUrl(null));
-    };
   }, []);
 
-   const handlePlayPause = (previewUrl) => {
-    if (currentPlayingUrl === previewUrl) {
-      // It's the current song, so pause it
-      audio.pause();
-      setCurrentPlayingUrl(null);
-    } else {
-      // It's a new song
-      audio.src = previewUrl;
-      audio.play();
-      setCurrentPlayingUrl(previewUrl);
-    }
-  };
 
   const handleLogin = () => {
     window.location.href = 'http://127.0.0.1:5001/api/auth/login';

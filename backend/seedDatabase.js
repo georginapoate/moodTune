@@ -4,7 +4,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { getLastFmData } = require('./src/services/lastfmService');
 const { getOpenAIEmbedding } = require('./src/services/openaiService');
-const { seedSongsCollection, closeDbConnection } = require('../services/dbService');
+const { seedSongsCollection, closeDbConnection } = require('../backend/src/services/dbService');
 
 const SEED_SONGS = [
   { artist: 'Queen', title: 'Bohemian Rhapsody', album: 'A Night at the Opera' },
@@ -205,6 +205,7 @@ async function getGeniusData(artist, title) {
 
 async function main() {
   console.log('--- Starting Definitive Data Seeding Process ---');
+  const songDocuments = [];
 
   try {
     for (const song of SEED_SONGS) {
@@ -258,6 +259,8 @@ async function main() {
         lastFmSummary: lastFmData.summary,
         pitchforkReview: pitchforkReview,
       };
+
+      songDocuments.push(songDocument);
 
       if (songDocuments.length > 0) {
         await seedSongsCollection(songDocuments);

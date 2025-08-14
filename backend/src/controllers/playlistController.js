@@ -91,6 +91,6 @@ const deleteGeneratedPlaylist = async (req, res) => {
 
 module.exports = {
     generatePlaylist,
-    savePlaylist: createSpotifyPlaylist,
+    createSpotifyPlaylist,
     deleteGeneratedPlaylist
 };

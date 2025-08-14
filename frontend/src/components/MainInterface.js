@@ -1,5 +1,5 @@
 // frontend/src/components/MainInterface.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './MainInterface.css';
 import SongPreviewList from './SongPreviewList';
@@ -12,6 +12,10 @@ function MainInterface({ accessToken, currentPlayingUrl, onPlayPause }) {
   const [error, setError] = useState('');
   const [originalPrompt, setOriginalPrompt] = useState('');
 
+  useEffect(() => {
+        console.log('STEP 2: The "songs" state has been updated. New value:', songs);
+    }, [songs]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     
@@ -20,6 +24,7 @@ function MainInterface({ accessToken, currentPlayingUrl, onPlayPause }) {
     setOriginalPrompt(prompt);
     setPlaylistUrl('');
     setError('');
+    setSongs([]);
 
     try {
       const response = await axios.post(
@@ -29,8 +34,7 @@ function MainInterface({ accessToken, currentPlayingUrl, onPlayPause }) {
           accessToken: accessToken,
         }
       );
-      const playableSongs = response.data.songs.filter(song => song.previewUrl);
-      setSongs(playableSongs);
+      setSongs(response.data.songs);
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'An unknown error occurred.';
       setError(errorMessage);
@@ -39,11 +43,13 @@ function MainInterface({ accessToken, currentPlayingUrl, onPlayPause }) {
     }
   };
 
-  const handleSaveToSpotify = async (songsToSave, prompt) => {
+  const handleSaveToSpotify = async () => {
+    
     if (songs.length === 0) {
       setError("Cannot save an empty playlist.");
       return;
     }
+
     setIsLoading(true);
     setError('');
     try {
@@ -95,12 +101,11 @@ function MainInterface({ accessToken, currentPlayingUrl, onPlayPause }) {
             {songs.length > 0 && !playlistUrl && (
                 <SongPreviewList
                     songs={songs}
+                    prompt={originalPrompt}
                     onSave={handleSaveToSpotify}
-                    // ---- NEW: Pass down the new handlers and state ----
                     onRemove={handleRemoveSong}
                     currentPlayingUrl={currentPlayingUrl}
                     onPlayPause={onPlayPause}
-                    // ----------------------------------------------------
                 />
             )}
         </div>
