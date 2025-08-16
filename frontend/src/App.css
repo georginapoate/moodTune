@@ -1,10 +1,10 @@
-/* frontend/src/App.css (adăugă sau modifică aceste stiluri) */
+/* frontend/src/App.css */
 .App {
-  text-align: center;
-  position: relative;
-  min-height: 100vh;
-  overflow: hidden;
-  transition: filter 0.3s ease-in-out;
+    text-align: center;
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    transition: filter 0.3s ease-in-out;
 }
 
 .main-content-container.blurred {
@@ -42,13 +42,13 @@
 }
 
 .App-header {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(10px + 2vmin);
+    color: white;
 }
 
 .landing-container h1 {

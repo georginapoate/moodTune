@@ -1,5 +1,5 @@
 // backend/controllers/playlistController.js
-const { searchTrackOnSpotify, createPlaylistFromTracks, deletePlaylist } = require('../services/spotifyService');
+const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks, deletePlaylist } = require('../services/spotifyService');
 const { findSimilarSongs } = require('../services/dbService');
 const { getOpenAIEmbedding } = require('../services/openaiService');
 
@@ -10,6 +10,8 @@ const generatePlaylist = async (req, res) => {
     if (!prompt || !accessToken) {
         return res.status(400).json({ error: 'A prompt and a Spotify access token are required.' });
     }
+
+    const spotifyApi = getSpotifyApi(accessToken);
 
     try {
         console.log("1. Generating embedding for prompt...");
@@ -27,7 +29,7 @@ const generatePlaylist = async (req, res) => {
         console.log(`3. Fetching Spotify metadata for each song...`);
 
         for (const doc of recommendedSongs) {
-            const spotifyMeta = await searchTrackOnSpotify(accessToken, doc.artist, doc.title);
+            const spotifyMeta = await searchTrackOnSpotify(spotifyApi, doc.artist, doc.title);
             results.push({
                 artist: doc.artist,
                 title: doc.title,
@@ -53,13 +55,19 @@ const generatePlaylist = async (req, res) => {
 };
 
 const createSpotifyPlaylist = async (req, res) => {
-    const { accessToken, songs, prompt } = req.body;
-    if (!accessToken || !songs || !prompt) {
-        return res.status(400).json({ error: 'Token, songs, and prompt are required.' });
-    }
     try {
-        const playlistUrl = await createPlaylistFromTracks(accessToken, songs, prompt);
-        res.json({ playlistUrl });
+        const { accessToken, songs, prompt } = req.body;
+        if (!accessToken || !songs || !prompt) {
+            return res.status(400).json({ error: 'Token, songs, and prompt are required.' });
+        }
+
+        const playlist = await createPlaylistFromTracks(accessToken, songs, prompt);
+
+        res.json({
+            success: true,
+            playlistUrl: playlist.playlistUrl,
+            addedTracks: playlist.tracks.length,
+        });
     } catch (error) {
         console.error('Error in savePlaylist:', error?.message || error);
         if (error.statusCode === 401) {
@@ -67,6 +75,7 @@ const createSpotifyPlaylist = async (req, res) => {
         }
         return res.status(500).json({ error: 'Failed to create playlist.' });
     }
+
 };
 
 const deleteGeneratedPlaylist = async (req, res) => {

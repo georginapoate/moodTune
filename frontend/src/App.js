@@ -14,22 +14,20 @@ function App() {
 
 
   useEffect(() => {
-    // 3. Create the instance and store it in the ref's .current property
     audioRef.current = new Audio();
-    
+
     const audio = audioRef.current; // for cleanup
-    
+
     const handleSongEnd = () => setCurrentPlayingUrl(null);
     audio.addEventListener('ended', handleSongEnd);
 
-    // Cleanup function to run when the App component unmounts
     return () => {
       audio.pause();
       audio.removeEventListener('ended', handleSongEnd);
     };
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     const audio = audioRef.current;
     if (currentPlayingUrl) {
       if (audio.src !== currentPlayingUrl) {
@@ -42,10 +40,9 @@ function App() {
   }, [currentPlayingUrl]);
 
   const handlePlayPause = (previewUrl) => {
-   setCurrentPlayingUrl(prevUrl => (prevUrl === previewUrl ? null : previewUrl));
- };
- 
-  // This useEffect logic is correct and does not need to change.
+    setCurrentPlayingUrl(prevUrl => (prevUrl === previewUrl ? null : previewUrl));
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tokenFromUrl = params.get('access_token');
@@ -67,16 +64,13 @@ function App() {
   };
 
   return (
-    // The main .App div no longer gets the blur class.
     <div className="App">
       <div className="background-gradient"></div>
-      
-      {/* --- THIS IS THE NEW CONTAINER FOR BLURRED CONTENT --- */}
-      {/* We apply the 'blurred' class to this div instead of the main one. */}
+
       <div className={`main-content-container ${showLoginModal ? 'blurred' : ''}`}>
         <header className="App-header">
           <div className="logo-corner">G</div>
-          
+
           {accessToken ? (
             <MainInterface
               accessToken={accessToken}
@@ -89,12 +83,10 @@ function App() {
         </header>
       </div>
 
-      {/* --- THE MODAL IS NOW A SIBLING, NOT A CHILD --- */}
-      {/* Because it's outside the blurred container, it will remain sharp. */}
       {showLoginModal && (
-        <LoginModal 
-          onLogin={handleLogin} 
-          onClose={() => setShowLoginModal(false)} 
+        <LoginModal
+          onLogin={handleLogin}
+          onClose={() => setShowLoginModal(false)}
         />
       )}
     </div>
