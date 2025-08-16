@@ -1,7 +1,7 @@
 // backend/controllers/authController.js
 const SpotifyWebApi = require('spotify-web-api-node');
 
-const scopes = ['playlist-modify-public', 'playlist-modify-private', 'user-read-private', 'user-read-email'];
+const scopes = ['streaming', 'user-read-playback-state', 'user-modify-playback-state', 'playlist-modify-public', 'playlist-modify-private', 'user-read-private', 'user-read-email'];
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID
 const SPOTIFY_CALLBACK_URL = process.env.SPOTIFY_CALLBACK_URL
@@ -10,13 +10,34 @@ const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET
 const {
     createSpotifyAuthorizeURL,
     getSpotifyTokens,
-    isSpotifyPremium,
+    refreshAccessToken,
 } = require('../services/spotifyService')
 
 const spotifyLogin = (req, res) => {
     const authorizeURL = createSpotifyAuthorizeURL(SPOTIFY_CLIENT_ID, SPOTIFY_CALLBACK_URL, scopes);
     res.redirect(authorizeURL);
 };
+
+const refreshToken = async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        return res.status(400).json({ error: 'Missing refresh token' });
+    }
+
+    try {
+        const { accessToken, expiresIn } = await refreshAccessToken(
+            refreshToken,
+            SPOTIFY_CLIENT_ID,
+            SPOTIFY_CLIENT_SECRET
+        );
+
+        return res.json({ accessToken, expiresIn });
+    } catch (error) {
+        console.error('Error refreshing token:', error.message);
+        return res.status(500).json({ error: 'Failed to refresh token' });
+    }
+}
 
 const spotifyCallback = async (req, res) => {
     const { code } = req.query;
@@ -42,25 +63,9 @@ const spotifyCallback = async (req, res) => {
     }
 };
 
-const checkPremiumStatus = async (req, res) => {
-    const accessToken = req.headers['authorization']?.replace('Bearer ', '');
-
-    if (!accessToken) {
-        return res.status(400).json({ error: 'Access token is required.' });
-    }
-
-    try {
-        const isPremium = await isSpotifyPremium(accessToken);
-        res.json({ isPremium: isPremium });
-    } catch (error) {
-        console.error('Error checking premium status:', error);
-        res.status(500).json({ error: 'Failed to retrieve user information.', details: error.message });
-    }
-};
-
 
 module.exports = {
     spotifyLogin,
     spotifyCallback,
-    checkPremiumStatus
+    refreshToken
 };

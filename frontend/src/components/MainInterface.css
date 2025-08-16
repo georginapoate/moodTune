@@ -2,7 +2,8 @@
 
 .main-interface-container {
   width: 100%;
-  max-width: 600px; /* Constrain the width for better readability */
+  max-width: 600px;
+  /* Constrain the width for better readability */
   padding: 20px;
 }
 
@@ -31,7 +32,8 @@
 
 .generator-container textarea:focus {
   outline: none;
-  border-color: #1DB954; /* Spotify Green */
+  border-color: #1DB954;
+  /* Spotify Green */
   box-shadow: 0 0 10px rgba(29, 185, 84, 0.5);
 }
 
@@ -59,7 +61,8 @@
 }
 
 /* Styles for the result messages */
-.result-success, .result-error {
+.result-success,
+.result-error {
   margin-top: 30px;
   padding: 20px;
   background-color: rgba(0, 0, 0, 0.3);
@@ -67,8 +70,8 @@
 }
 
 .result-success h3 {
-    margin-top: 0;
-    color: #1DB954;
+  margin-top: 0;
+  color: #1DB954;
 }
 
 .result-success a {
@@ -83,10 +86,70 @@
 }
 
 .result-success a:hover {
-    transform: scale(1.05);
+  transform: scale(1.05);
 }
 
 .result-error {
-    color: #ff4d4d;
-    font-weight: bold;
+  color: #ff4d4d;
+  font-weight: bold;
+}
+
+.premium-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999
+}
+
+.pp-card {
+  background: #181818;
+  color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .4)
+}
+
+.pp-title {
+  font-weight: 700;
+  margin-bottom: 8px
+}
+
+.pp-body {
+  opacity: .85;
+  margin-bottom: 14px
+}
+
+.pp-close {
+  background: #1db954;
+  border: none;
+  color: #000;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer
+}
+
+.album-art-container {
+  position: relative
+}
+
+.play-icon-overlay {
+  position: absolute;
+  inset: auto 8px 8px auto;
+  background: #1db954;
+  border: none;
+  color: #000;
+  font-weight: 700;
+  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer
 }
