@@ -15,43 +15,46 @@
 }
 
 .generator-container textarea {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(169, 169, 169, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 15px;
+  border-radius: 16px;
+  padding: 18px;
   font-size: 1.1rem;
   color: white;
   font-family: inherit;
   resize: vertical;
-  min-height: 100px;
+  min-height: 120px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .generator-container textarea::placeholder {
   color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
 }
 
 .generator-container textarea:focus {
   outline: none;
-  border-color: #1DB954;
+  border-color: #ab76b2;
   /* Spotify Green */
   box-shadow: 0 0 10px rgba(29, 185, 84, 0.5);
 }
 
 .generator-container button[type="submit"] {
-  background-color: #1DB954;
+  align-self: flex-start;
+  background-color: #7f3195;
   color: white;
-  font-weight: bold;
+  font-weight: 600;
   border: none;
-  border-radius: 50px;
-  padding: 15px 30px;
-  font-size: 1.1rem;
+  border-radius: 30px;
+  padding: 14px 32px;
+  font-size: 1rem;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.25s ease, transform 0.2s ease;
 }
 
 .generator-container button[type="submit"]:hover {
-  background-color: #1ed760;
-  transform: scale(1.03);
+  background-color: #d8cff6;
+  transform: translateY(-2px);
 }
 
 .generator-container button[type="submit"]:disabled {

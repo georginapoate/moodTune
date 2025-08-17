@@ -2,9 +2,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import './MainInterface.css';
-import SongPreviewList from './SongPreviewList';
-import useUnifiedPlayer from '../hooks/useUnifiedPlayer';
-import AudioPlayerBar from './AudioPlayerBar';
+import SongPreviewList from './SongPreviewList.jsx';
+import useUnifiedPlayer from '../hooks/useUnifiedPlayer.js';
+import AudioPlayerBar from './AudioPlayerBar.jsx';
 
 function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
   const [accessToken, setAccessToken] = useState(initialAccessToken);
@@ -118,19 +118,20 @@ function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
       )}
 
       <div className="main-content">
-        <form onSubmit={handleSubmit}>
-          <textarea
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            placeholder="e.g., an abandoned space station drifting towards a black hole"
-            rows="4"
-            required
-          />
-          <button type="submit" disabled={isLoading}>
-            {isLoading && !playlistUrl ? 'Vibing...' : 'Create My Playlist'}
-          </button>
-        </form>
-
+        <div className="generator-container">
+          <form onSubmit={handleSubmit}>
+            <textarea
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder="e.g., an abandoned space station drifting towards a black hole"
+              rows="4"
+              required
+            />
+            <button type="submit" disabled={isLoading}>
+              {isLoading && !playlistUrl ? 'Vibing...' : 'Create My Playlist'}
+            </button>
+          </form>
+        </div>
         {error && <p className="result-error">Error: {error}</p>}
 
         {playlistUrl && (
