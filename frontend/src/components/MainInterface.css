@@ -7,6 +7,11 @@
   padding: 20px;
 }
 
+.prompt-form {
+  padding: 10px,
+
+}
+
 /* Styles for the PlaylistGenerator component's elements */
 .generator-container form {
   display: flex;

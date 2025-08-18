@@ -118,8 +118,8 @@ function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
       )}
 
       <div className="main-content">
-        <form onSubmit={handleSubmit}>
-          <textarea
+        <form className="prompt-form" onSubmit={handleSubmit}>
+          <textarea className="prompt-textarea"
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             placeholder="e.g., an abandoned space station drifting towards a black hole"
