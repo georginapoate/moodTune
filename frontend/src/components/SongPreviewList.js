@@ -1,6 +1,6 @@
 // src/components/SongPreviewList.js
 import React from 'react';
-import SongItem from './SongItem.jsx';
+import SongItem from './SongItem';
 
 export default function SongPreviewList({
     songs, prompt, onSave, onRemove, currentPlayingUrl, onPlayPause, isPremium

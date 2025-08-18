@@ -1,7 +1,5 @@
 // src/components/AudioPlayerBar.js
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
-
 import './AudioPlayerBar.css';
 
 export default function AudioPlayerBar({ title, artist, image, isPlaying, progress, duration, onTogglePlay, onSeek }) {

@@ -1,9 +1,9 @@
 // frontend/src/App.js
 import './App.css';
 import React, { useState, useEffect, useRef } from 'react';
-import LandingPage from './components/LandingPage.jsx';
-import LoginModal from './components/LoginModal.jsx';
-import MainInterface from './components/MainInterface.jsx';
+import LandingPage from './components/LandingPage';
+import LoginModal from './components/LoginModal';
+import MainInterface from './components/MainInterface';
 
 function App() {
   const [accessToken, setAccessToken] = useState(null);
