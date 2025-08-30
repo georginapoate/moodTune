@@ -1,4 +1,4 @@
-# MoodTunes 🎵
+# povTunes 🎵
 
 A full-stack web application that generates a custom Spotify playlist based on a creative text prompt, like "a rainy afternoon in a cozy coffee shop."
 

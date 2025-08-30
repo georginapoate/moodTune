@@ -1,22 +1,17 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
+const { encrypt } = require('../../utils/crypto');
+const { getDb } = require('../db/connection');
 
 const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'moodtunes';
 const SONGS_COLLECTION = 'songs';
+const USERS_COLLECTION = 'users';
 
 let client;
 
-async function getDbCollection() {
-    if (!client || !client.topology || !client.topology.isConnected()) {
-        client = new MongoClient(MONGO_URI);
-        await client.connect();
-        console.log("New DB Connection established.");
-    }
-    return client.db(DB_NAME).collection(SONGS_COLLECTION);
-}
 
 async function findSimilarSongs(promptEmbedding) {
-    const collection = await getDbCollection();
+    const collection = await getDb().collection(SONGS_COLLECTION);
 
     const searchPipeline = [
         {
@@ -42,27 +37,107 @@ async function findSimilarSongs(promptEmbedding) {
 }
 
 async function seedSongsCollection(songDocuments) {
-    const collection = await getDbCollection();
-    await collection.deleteMany({});
-    console.log('> Cleared existing songs from the collection.');
 
-    if (songDocuments.length > 0) {
-        await collection.insertMany(songDocuments);
-        console.log(`> Successfully inserted ${songDocuments.length} songs into the database.`);
+    if (!songDocuments || songDocuments.length === 0) {
+        console.log(`> No song documents provided to seed. Stopping the seed process.`);
+        return;
+    }
+
+    const collection = await getDb().collection(SONGS_COLLECTION);
+    console.log('> Seeding songs collection...');
+
+    try {
+        await collection.createIndex({ artist: 1, title: 1 }, { unique: true });
+        console.log('  - Ensured unique index on { artist, title } exists.');
+    } catch (indexError) {
+        console.error('! Error creating unique index:', indexError.message);
+        return;
+    }
+
+    const operations = songDocuments.map(doc => ({
+        updateOne: {
+        filter: { artist: doc.artist, title: doc.title }, 
+        update: { $set: doc },
+        upsert: true,
+        },
+    }));
+
+    try {
+        const result = await collection.bulkWrite(operations);
+        console.log('> Bulk upsert operation complete.');
+        console.log(`  - Songs freshly inserted: ${result.upsertedCount}`);
+        console.log(`  - Existing songs updated: ${result.modifiedCount}`);
+        console.log(`  - Total songs matched: ${result.matchedCount}`);
+    } catch (error) {
+        console.error('! An error occurred during the bulk write operation:', error);
     }
 }
 
-async function closeDbConnection() {
-    if (client && client.topology && client.topology.isConnected()) {
-        await client.close();
-        console.log("DB Connection closed.");
+async function findOrCreateUser(spotifyProfile, tokens) {
+  const usersCollection = await getDb().collection(USERS_COLLECTION);
+
+  const { id, display_name, email, images } = spotifyProfile;
+
+  // Encrypt tokens, as this happens in both update and create scenarios
+  const encryptedAccessToken = encrypt(tokens.accessToken);
+  const encryptedRefreshToken = encrypt(tokens.refreshToken);
+
+  console.log(`Searching for user with Spotify ID: ${id}`);
+  const existingUser = await usersCollection.findOne({ spotifyId: id });
+
+  if (existingUser) {
+    // --- SCENARIO 1: USER EXISTS ---
+    console.log(`User found: ${existingUser.displayName}. Updating tokens.`);
+    
+    await usersCollection.updateOne(
+      { _id: existingUser._id },
+      {
+        $set: {
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          displayName: display_name,
+          profileImageUrl: images?.[0]?.url || null,
+        }
+      }
+    );
+    
+    return { ...existingUser, accessToken: encryptedAccessToken, refreshToken: encryptedRefreshToken };
+  
+  } else {
+    console.log(`User not found. Creating new user: ${display_name}`);
+    
+    const newUserDocument = {
+      spotifyId: id,
+      displayName: display_name,
+      email: email,
+      profileImageUrl: images?.[0]?.url || null,
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken,
+      createdAt: new Date(),
+    };
+
+    const insertResult = await usersCollection.insertOne(newUserDocument);
+    
+    if (insertResult.insertedId) {
+      console.log(`Successfully created new user with DB ID: ${insertResult.insertedId}`);
+      return newUserDocument;
+    } else {
+      console.error("!!! CRITICAL: Failed to insert new user into the database. !!!");
+      return null; // Return null if the insert operation fails
     }
+  }
+}
+
+async function findUserById(userId) {
+  const usersCollection = await getDb().collection(USERS_COLLECTION);
+  // We need to convert the string ID to a MongoDB ObjectId
+  return usersCollection.findOne({ _id: new ObjectId(userId) });
 }
 
 
 module.exports = {
-    // getDbCollection,
     findSimilarSongs,
     seedSongsCollection,
-    closeDbConnection
+    findOrCreateUser,
+    findUserById,
 }

@@ -1,33 +1,68 @@
 // backend/index.js
 
+// Load environment variables FIRST
 require('dotenv').config();
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const { connectDB } = require('./src/db/connection');
 
+// --- APP INITIALIZATION ---
 const app = express();
-const port = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5001;
 const host = '127.0.0.1';
 
+// --- MIDDLEWARE SETUP ---
+// This middleware runs for every request and is great for debugging
 app.use((req, res, next) => {
   console.log(`\n--- Request: ${req.method} ${req.originalUrl} ---`);
   next();
 });
 
-app.use(cors()); 
-app.use(express.json());
+// Configure CORS to allow requests from your frontend
+app.use(cors({
+  origin: 'http://127.0.0.1:3000', // Your Vite frontend URL
+  credentials: true, // This allows cookies to be sent and received
+}));
 
+// Standard body and cookie parsers
+app.use(express.json());
+app.use(cookieParser());
+
+// --- ROUTES SETUP ---
 const authRoutes = require('./src/routes/authRoutes');
+const userRoutes = require('./src/routes/userRoutes');
 const playlistRoutes = require('./src/routes/playlistRoutes');
 
 app.use('/api/auth', authRoutes);
+console.log("Attempting to register user routes for the '/api/users' path...");
+app.use('/api/users', userRoutes);
+console.log("User routes should now be registered.");
 app.use('/api/playlist', playlistRoutes);
 
-
+// A simple root route to check if the server is up
 app.get('/', (req, res) => {
   res.send('Hello World! Backend is up.');
 });
 
-app.listen(port, host, () => {
-  console.log(`Backend server is running on http://${host}:${port}`);
-});
+// --- SERVER STARTUP LOGIC ---
+const startServer = async () => {
+  try {
+    // 1. Connect to the database FIRST. This is an awaitable promise.
+    await connectDB();
+    
+    // 2. ONLY AFTER the database is connected, start listening for requests.
+    // The process will now stay alive because of this listener.
+    app.listen(PORT, host, () => {
+      console.log(`✅ Server is running and listening on http://${host}:${PORT}`);
+      console.log("Database connection is successful. Ready to accept requests.");
+    });
+  } catch (error) {
+    console.error("❌ Failed to start the server:", error);
+    process.exit(1); // Exit the process with an error code
+  }
+};
+
+// --- EXECUTE THE STARTUP ---
+startServer();

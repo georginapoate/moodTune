@@ -33,7 +33,7 @@ export default function useSpotifyPlayer({ getAccessToken, enabled }) {
             const spotifyToken = await getAccessToken(); // MUST be fresh & include 'streaming' + playback scopes
 
             const p = new window.Spotify.Player({
-                name: 'MoodTunes Player',
+                name: 'povTunes Player',
                 getOAuthToken: async cb => cb(await getAccessToken()),
                 volume: 0.8
             });

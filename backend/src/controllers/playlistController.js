@@ -1,16 +1,23 @@
 // backend/controllers/playlistController.js
 const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks, deletePlaylist } = require('../services/spotifyService');
-const { findSimilarSongs } = require('../services/dbService');
+const { findSimilarSongs, findUserById } = require('../services/dbService');
 const { getOpenAIEmbedding } = require('../services/openaiService');
-
+const { decrypt } = require('../../utils/crypto');
 
 const generatePlaylist = async (req, res) => {
-    const { prompt, accessToken } = req.body;
+    const { prompt } = req.body;
 
-    if (!prompt || !accessToken) {
-        return res.status(400).json({ error: 'A prompt and a Spotify access token are required.' });
+    if (!prompt) {
+        return res.status(400).json({ error: 'A prompt is required.' });
     }
 
+    const user = await findUserById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+
+    const accessToken = decrypt(user.accessToken);
     const spotifyApi = getSpotifyApi(accessToken);
 
     try {
@@ -47,19 +54,23 @@ const generatePlaylist = async (req, res) => {
 
     } catch (error) {
         console.error('An error occurred in the playlist controller:', error);
-        if (error.statusCode === 401) {
-            return res.status(401).json({ error: 'Spotify token expired.' });
-        }
         res.status(500).json({ error: 'Failed to generate playlist.' });
     }
 };
 
 const createSpotifyPlaylist = async (req, res) => {
     try {
-        const { accessToken, songs, prompt } = req.body;
-        if (!accessToken || !songs || !prompt) {
-            return res.status(400).json({ error: 'Token, songs, and prompt are required.' });
+        const { songs, prompt } = req.body;
+        if ( !songs || !prompt) {
+            return res.status(400).json({ error: 'Songs, and prompt are required.' });
         }
+
+        const user = await findUserById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        const accessToken = decrypt(user.accessToken);
 
         const playlist = await createPlaylistFromTracks(accessToken, songs, prompt);
 
@@ -70,30 +81,30 @@ const createSpotifyPlaylist = async (req, res) => {
         });
     } catch (error) {
         console.error('Error in savePlaylist:', error?.message || error);
-        if (error.statusCode === 401) {
-            return res.status(401).json({ error: 'Spotify token expired.' });
-        }
         return res.status(500).json({ error: 'Failed to create playlist.' });
     }
 
 };
 
 const deleteGeneratedPlaylist = async (req, res) => {
-    const { accessToken } = req.body;
-    const { playlistId } = req.params;
-
-    if (!accessToken || !playlistId) {
-        return res.status(400).json({ error: 'Access token and playlist ID are required.' });
-    }
-
     try {
+        const { playlistId } = req.params; // Get playlistId from the URL path
+        if (!playlistId) {
+            return res.status(400).json({ error: 'Playlist ID is required.' });
+        }
+
+        const user = await findUserById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        const accessToken = decrypt(user.accessToken);
         await deletePlaylist(accessToken, playlistId);
+        
         res.status(200).json({ message: 'Playlist successfully deleted.' });
+
     } catch (error) {
         console.error('Error in deleteGeneratedPlaylist controller:', error.message);
-        if (error.statusCode === 401) {
-            return res.status(401).json({ error: 'Spotify token expired.' });
-        }
         res.status(500).json({ error: 'Failed to delete playlist.' });
     }
 }

@@ -6,61 +6,37 @@ import SongPreviewList from './SongPreviewList';
 import useUnifiedPlayer from '../hooks/useUnifiedPlayer';
 import AudioPlayerBar from './AudioPlayerBar';
 
-function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
-  const [accessToken, setAccessToken] = useState(initialAccessToken);
+const API_BASE_URL = 'http://127.0.0.1:5001';
+
+function MainInterface({user, currentPlayingUrl, onPlayPause }) {
   const [prompt, setPrompt] = useState('');
   const [songs, setSongs] = useState([]);
   const [playlistUrl, setPlaylistUrl] = useState('');
   const [error, setError] = useState('');
   const [originalPrompt, setOriginalPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [showPremiumPopup, setShowPremiumPopup] = useState(false);
+
+  // check premium status & popup
+  const isPremium = useMemo(() => user?.product === 'premium', [user]);
+  const [showPremiumPopup, setShowPremiumPopup] = useState(!isPremium);
 
   // fresh token supplier for SDK
-  const getAccessToken = useCallback(async () => {
-    // OPTIONAL: call backend to refresh if needed
+const getAccessToken = useCallback(async () => {
     try {
-      const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${accessToken}` }
+      const response = await axios.get(`${API_BASE_URL}/api/auth/player-token`, {
+        withCredentials: true, // This sends our secure session cookie!
       });
-      if (res.status === 401 && refreshToken) {
-        const r = await fetch('http://127.0.0.1:5001/api/auth/refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken })
-        });
-        const data = await r.json();
-        if (data.accessToken) setAccessToken(data.accessToken);
-        return data.accessToken || accessToken;
-      }
-    } catch {
-      // ignore; fall back to existing token
+      return response.data.accessToken;
+    } catch (err) {
+      console.error("Could not fetch player token", err);
+      return null;
     }
-    return accessToken;
-  }, [accessToken, refreshToken]);
+  }, []);
 
   const player = useUnifiedPlayer({ isPremium, getAccessToken });
 
-  useEffect(() => {
-    (async () => {
-      if (!accessToken) return;
-      try {
-        const res = await fetch('https://api.spotify.com/v1/me', {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const data = await res.json();
-        const premium = data?.product === 'premium';
-        setIsPremium(premium);
-        setShowPremiumPopup(!premium);
-      } catch {
-        setIsPremium(false);
-        setShowPremiumPopup(true);
-      }
-    })();
-  }, [accessToken]);
 
-  const handleSubmit = async e => {
+const handleSubmit = async e => {
     e.preventDefault();
     setIsLoading(true);
     setSongs([]);
@@ -68,9 +44,10 @@ function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
     setPlaylistUrl('');
     setError('');
     try {
-      const resp = await axios.post('http://127.0.0.1:5001/api/playlist/generate', {
-        prompt, accessToken
-      });
+      const resp = await axios.post(`${API_BASE_URL}/api/playlist/generate`,
+        { prompt },
+        { withCredentials: true }
+      );
       setSongs(resp.data.songs);
     } catch (err) {
       setError(err.response?.data?.error || 'An unknown error occurred.');
@@ -84,9 +61,10 @@ function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
     setIsLoading(true);
     setError('');
     try {
-      const resp = await axios.post('http://127.0.0.1:5001/api/playlist/create', {
-        songs, prompt: originalPrompt, accessToken
-      });
+      const resp = await axios.post(`${API_BASE_URL}/api/playlist/create`,
+        { songs, prompt: originalPrompt },
+        { withCredentials: true }
+      );
       setPlaylistUrl(resp.data.playlistUrl);
       setSongs([]);
       setPrompt('');
@@ -96,6 +74,7 @@ function MainInterface({ accessToken: initialAccessToken, refreshToken }) {
       setIsLoading(false);
     }
   };
+
 
   const handlePlayPause = (uriOrUrl, meta) => {
     player.toggleTrack(uriOrUrl, meta);

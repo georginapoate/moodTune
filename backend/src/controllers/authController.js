@@ -1,5 +1,9 @@
 // backend/controllers/authController.js
 const SpotifyWebApi = require('spotify-web-api-node');
+const jwt = require('jsonwebtoken');
+const { findOrCreateUser, findUserById} = require('../services/dbService');
+const { getSpotifyApi } = require('../services/spotifyService');
+const { decrypt } = require('../../utils/crypto');
 
 const scopes = ['streaming', 'user-read-playback-state', 'user-modify-playback-state', 'playlist-modify-public', 'playlist-modify-private', 'user-read-private', 'user-read-email'];
 
@@ -12,6 +16,7 @@ const {
     getSpotifyTokens,
     refreshAccessToken,
 } = require('../services/spotifyService')
+
 
 const spotifyLogin = (req, res) => {
     const authorizeURL = createSpotifyAuthorizeURL(SPOTIFY_CLIENT_ID, SPOTIFY_CALLBACK_URL, scopes);
@@ -50,7 +55,36 @@ const spotifyCallback = async (req, res) => {
         const { accessToken, refreshToken } = await getSpotifyTokens(
             code, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_CALLBACK_URL
         )
-        res.redirect(`http://127.0.0.1:3000?access_token=${accessToken}&refresh_token=${refreshToken}`);
+
+        // res.redirect(`http://127.0.0.1:3000?access_token=${accessToken}&refresh_token=${refreshToken}`);
+
+        const spotifyApi = getSpotifyApi(accessToken);
+
+        const meResponse = await spotifyApi.getMe();
+        const spotifyProfile = await meResponse.body;
+
+        console.log('Successfully fetched Spotify profile:', spotifyProfile);
+
+        const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
+        console.log("User document received in controller:", user);
+        if (!user) {
+            throw new Error("Failed to find or create user in the database.");
+        }
+
+
+        const token = jwt.sign(
+            { userId: user._id, spotifyId: user.spotifyId },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+        
+        res.redirect(`http://127.0.0.1:3000/`);
 
     } catch (error) {
 
@@ -63,9 +97,23 @@ const spotifyCallback = async (req, res) => {
     }
 };
 
+const getPlayerToken = async (req, res) => {
+  try {
+    const user = await findUserById(req.userId); // req.userId comes from our 'protect' middleware
+    if (!user || !user.accessToken) {
+      return res.status(404).json({ message: 'User or token not found' });
+    }
+    const accessToken = decrypt(user.accessToken);
+    res.json({ accessToken });
+  } catch (error) {
+    console.error("Error fetching player token:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 module.exports = {
     spotifyLogin,
     spotifyCallback,
+    getPlayerToken,
     refreshToken
 };
