@@ -9,7 +9,6 @@ const USERS_COLLECTION = 'users';
 
 let client;
 
-
 async function findSimilarSongs(promptEmbedding) {
     const collection = await getDb().collection(SONGS_COLLECTION);
 
@@ -74,19 +73,23 @@ async function seedSongsCollection(songDocuments) {
 }
 
 async function findOrCreateUser(spotifyProfile, tokens) {
-  const usersCollection = await getDb().collection(USERS_COLLECTION);
+  const usersCollection = getDb().collection('users');
+  const { id: spotifyId, display_name, email, images } = spotifyProfile;
 
-  const { id, display_name, email, images } = spotifyProfile;
+  try {
+    await usersCollection.createIndex({ spotifyId: 1 }, { unique: true });
+    console.log("Ensured unique index on 'spotifyId' exists for the users collection.");
+  } catch (indexError) {
+    console.warn("Could not create unique index on users (it likely already exists).");
+  }
 
-  // Encrypt tokens, as this happens in both update and create scenarios
   const encryptedAccessToken = encrypt(tokens.accessToken);
   const encryptedRefreshToken = encrypt(tokens.refreshToken);
 
-  console.log(`Searching for user with Spotify ID: ${id}`);
-  const existingUser = await usersCollection.findOne({ spotifyId: id });
+  console.log(`Searching for user with Spotify ID: ${spotifyId}`);
+  const existingUser = await usersCollection.findOne({ spotifyId: spotifyId });
 
   if (existingUser) {
-    // --- SCENARIO 1: USER EXISTS ---
     console.log(`User found: ${existingUser.displayName}. Updating tokens.`);
     
     await usersCollection.updateOne(
@@ -101,13 +104,17 @@ async function findOrCreateUser(spotifyProfile, tokens) {
       }
     );
     
-    return { ...existingUser, accessToken: encryptedAccessToken, refreshToken: encryptedRefreshToken };
+    const updatedUser = { ...existingUser,
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken
+    };
+    return updatedUser;
   
   } else {
     console.log(`User not found. Creating new user: ${display_name}`);
     
     const newUserDocument = {
-      spotifyId: id,
+      spotifyId: spotifyId,
       displayName: display_name,
       email: email,
       profileImageUrl: images?.[0]?.url || null,
@@ -120,24 +127,39 @@ async function findOrCreateUser(spotifyProfile, tokens) {
     
     if (insertResult.insertedId) {
       console.log(`Successfully created new user with DB ID: ${insertResult.insertedId}`);
-      return newUserDocument;
+      return { ...newUserDocument, _id: insertResult.insertedId };
     } else {
       console.error("!!! CRITICAL: Failed to insert new user into the database. !!!");
-      return null; // Return null if the insert operation fails
+      return null;
     }
   }
 }
 
 async function findUserById(userId) {
   const usersCollection = await getDb().collection(USERS_COLLECTION);
-  // We need to convert the string ID to a MongoDB ObjectId
   return usersCollection.findOne({ _id: new ObjectId(userId) });
+}
+
+async function savePromptToHistory(userId, promptText, songIds) {
+  try {
+    const promptsCollection = getDb().collection('prompts');
+    await promptsCollection.insertOne({
+      userId: new ObjectId(userId),
+      promptText: promptText,
+      generatedSongIds: songIds,
+      createdAt: new Date()
+    });
+    console.log(`Successfully saved prompt history for user ${userId}`);
+  } catch (error) {
+    console.error("Error saving prompt to history:", error);
+  }
 }
 
 
 module.exports = {
     findSimilarSongs,
     seedSongsCollection,
+    savePromptToHistory,
     findOrCreateUser,
     findUserById,
 }

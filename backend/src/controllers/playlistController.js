@@ -1,8 +1,10 @@
 // backend/controllers/playlistController.js
-const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks, deletePlaylist } = require('../services/spotifyService');
-const { findSimilarSongs, findUserById } = require('../services/dbService');
+const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks} = require('../services/spotifyService');
+const { findSimilarSongs, findUserById, savePromptToHistory  } = require('../services/dbService');
 const { getOpenAIEmbedding } = require('../services/openaiService');
 const { decrypt } = require('../../utils/crypto');
+const { ObjectId } = require('mongodb');
+const { getDb } = require('../db/connection');
 
 const generatePlaylist = async (req, res) => {
     const { prompt } = req.body;
@@ -16,14 +18,12 @@ const generatePlaylist = async (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-
     const accessToken = decrypt(user.accessToken);
     const spotifyApi = getSpotifyApi(accessToken);
 
     try {
         console.log("1. Generating embedding for prompt...");
         const promptEmbedding = await getOpenAIEmbedding(prompt);
-
         const recommendedSongs = await findSimilarSongs(promptEmbedding);
 
         if (recommendedSongs.length === 0) {
@@ -48,6 +48,11 @@ const generatePlaylist = async (req, res) => {
                 albumImage: spotifyMeta?.albumImage || 'https://picsum.photos/200',
                 spotifyExternalUrl: spotifyMeta?.spotifyExternalUrl || null,
             });
+        }
+
+        if (results.length > 0) {
+            const songIds = recommendedSongs.map(song => new ObjectId(song._id));
+            await savePromptToHistory(req.userId, prompt, songIds);
         }
         console.log(`4. Returning ${results.length} songs to frontend.`);
         return res.json({ songs: results, prompt });
@@ -88,21 +93,30 @@ const createSpotifyPlaylist = async (req, res) => {
 
 const deleteGeneratedPlaylist = async (req, res) => {
     try {
-        const { playlistId } = req.params; // Get playlistId from the URL path
-        if (!playlistId) {
-            return res.status(400).json({ error: 'Playlist ID is required.' });
+        const { playlistId: promptId } = req.params;
+        const userId = req.userId;
+
+        if (!ObjectId.isValid(promptId)) {
+            return res.status(400).json({ error: 'Invalid playlist history ID format.' });
         }
 
-        const user = await findUserById(req.userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
+        const promptsCollection = getDb().collection('prompts');
 
-        const accessToken = decrypt(user.accessToken);
-        await deletePlaylist(accessToken, playlistId);
+        const query = {
+            _id: new ObjectId(promptId),
+            userId: new ObjectId(userId)
+        };
+       console.log("Query for deletion:", query);
+        // Attempt to delete the document    
+
+        const result = await promptsCollection.deleteOne(query);
         
-        res.status(200).json({ message: 'Playlist successfully deleted.' });
-
+        console.log("Result from deleteOne:", result);
+        if (result.deletedCount === 1) {
+            res.status(200).json({ message: 'Playlist history successfully deleted.' });
+        } else {
+            res.status(404).json({ message: 'Playlist history not found or you do not have permission to delete it.' });
+        }
     } catch (error) {
         console.error('Error in deleteGeneratedPlaylist controller:', error.message);
         res.status(500).json({ error: 'Failed to delete playlist.' });
@@ -112,5 +126,6 @@ const deleteGeneratedPlaylist = async (req, res) => {
 module.exports = {
     generatePlaylist,
     createSpotifyPlaylist,
-    deleteGeneratedPlaylist
+    deleteGeneratedPlaylist,
+    savePromptToHistory
 };

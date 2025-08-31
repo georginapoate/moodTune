@@ -8,7 +8,7 @@ import AudioPlayerBar from './AudioPlayerBar';
 
 const API_BASE_URL = 'http://127.0.0.1:5001';
 
-function MainInterface({user, currentPlayingUrl, onPlayPause }) {
+function MainInterface({user, currentPlayingUrl, onPlayPause, onShowHistory  }) {
   const [prompt, setPrompt] = useState('');
   const [songs, setSongs] = useState([]);
   const [playlistUrl, setPlaylistUrl] = useState('');
@@ -130,6 +130,12 @@ const handleSubmit = async e => {
             isPremium={isPremium}
           />
         )}
+      </div>
+
+      <div className="main-interface-footer">
+        <button className="history-button" onClick={onShowHistory}>
+          View Playlist History
+        </button>
       </div>
 
       {player.state.trackUri && (

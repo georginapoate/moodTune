@@ -73,7 +73,7 @@ const spotifyCallback = async (req, res) => {
 
 
         const token = jwt.sign(
-            { userId: user._id, spotifyId: user.spotifyId },
+            { userId: user._id.toString(), spotifyId: user.spotifyId },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );

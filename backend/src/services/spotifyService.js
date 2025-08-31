@@ -138,14 +138,6 @@ const createPlaylistFromTracks = async (accessToken, recommendedSongs, prompt) =
 };
 
 
-const deletePlaylist = async (accessToken, playlistId) => {
-  const spotifyApi = getSpotifyApi(accessToken);
-  console.log(`Spotify Service: Deleting playlist with ID: ${playlistId}`);
-  // Spotify's term for deleting a playlist is "unfollowing" it.
-  await spotifyApi.unfollowPlaylist(playlistId);
-  console.log(' > Playlist successfully deleted (unfollowed).');
-};
-
 module.exports = {
   getSpotifyApi,
   createSpotifyAuthorizeURL,
@@ -153,5 +145,4 @@ module.exports = {
   refreshAccessToken,
   createPlaylistFromTracks,
   searchTrackOnSpotify,
-  deletePlaylist,
 };

@@ -9,6 +9,6 @@ const { protect } = require('../middleware/authMiddleware');
 // Define the route and tell it to use the controller function to handle the request
 router.post('/generate', protect, generatePlaylist);
 router.post('/create', protect, createSpotifyPlaylist);
-router.delete('/:playlistId', deleteGeneratedPlaylist);
+router.delete('/:playlistId', protect, deleteGeneratedPlaylist);
 
 module.exports = router;
