@@ -42,7 +42,7 @@ export default function SongItem({ song, onRemove, isPlaying, onPlayPause, isPre
 
       <button
         onClick={() => onRemove(song.spotifyTrackId)}
-        className="mt-3 w-full text-destructive hover:text-destructive/80 text-sm font-medium transition-colors"
+        className="mt-3 w-full text-destructive hover:text-destructive/80 text-sm font-medium transition-colors cursor-pointer"
       >
         Remove
       </button>
