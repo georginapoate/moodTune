@@ -4,31 +4,28 @@ const { getDb } = require('../db/connection');
 const { decrypt } = require('../../utils/crypto');
 const SpotifyWebApi = require('spotify-web-api-node');
 const { ObjectId } = require('mongodb');
+const { findUserById } = require('../services/dbService');
 
 const getMe = async (req, res) => {
   try {
-    const usersCollection = getDb().collection('users');
-
-    if (!req.userId || !ObjectId.isValid(req.userId)) {
-      return res.status(400).json({ message: 'Invalid user ID format' });
-    }
-    const userIdAsObject = new ObjectId(req.userId);
-    const user = await usersCollection.findOne({ _id: userIdAsObject });
+    const user = await findUserById(req.userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found in our database' });
     }
-
-    const accessToken = decrypt(user.accessToken);
-
-    const spotifyApi = new SpotifyWebApi();
-    spotifyApi.setAccessToken(accessToken);
-    const meResponse = await spotifyApi.getMe();
+    const userProfile = {
+      spotifyId: user.spotifyId,
+      displayName: user.displayName,
+      email: user.email,
+      profileImageUrl: user.profileImageUrl,
+      product: user.product,
+      followers: user.followers
+    };
     
-    res.json(meResponse.body);
+    res.json(userProfile);
 
   } catch (error) {
-    console.error("Error in /me endpoint:", error);
+    console.error("Error in getMe endpoint:", error);
     res.status(500).json({ message: "Failed to fetch Spotify profile" });
   }
 };

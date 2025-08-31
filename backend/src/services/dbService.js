@@ -74,7 +74,7 @@ async function seedSongsCollection(songDocuments) {
 
 async function findOrCreateUser(spotifyProfile, tokens) {
   const usersCollection = getDb().collection('users');
-  const { id: spotifyId, display_name, email, images } = spotifyProfile;
+  const { id: spotifyId, display_name, email, images, product, followers } = spotifyProfile;
 
   try {
     await usersCollection.createIndex({ spotifyId: 1 }, { unique: true });
@@ -100,6 +100,8 @@ async function findOrCreateUser(spotifyProfile, tokens) {
           refreshToken: encryptedRefreshToken,
           displayName: display_name,
           profileImageUrl: images?.[0]?.url || null,
+          product: product,
+          followers: followers,
         }
       }
     );
@@ -118,6 +120,8 @@ async function findOrCreateUser(spotifyProfile, tokens) {
       displayName: display_name,
       email: email,
       profileImageUrl: images?.[0]?.url || null,
+      product: product, // Add this
+      followers: followers, // Add this
       accessToken: encryptedAccessToken,
       refreshToken: encryptedRefreshToken,
       createdAt: new Date(),

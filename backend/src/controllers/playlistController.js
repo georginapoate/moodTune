@@ -50,12 +50,22 @@ const generatePlaylist = async (req, res) => {
             });
         }
 
-        if (results.length > 0) {
+        console.log(`4. De-duplicating ${results.length} songs based on Spotify Track ID...`);
+        const uniqueSongsMap = new Map();
+        results.forEach(song => {
+          // We only add songs that have a valid Spotify ID and are not already in our map
+          if (song.spotifyTrackId && !uniqueSongsMap.has(song.spotifyTrackId)) {
+            uniqueSongsMap.set(song.spotifyTrackId, song);
+          }
+        });
+        const uniqueResults = Array.from(uniqueSongsMap.values());
+
+        if (uniqueResults.length > 0) {
             const songIds = recommendedSongs.map(song => new ObjectId(song._id));
             await savePromptToHistory(req.userId, prompt, songIds);
         }
-        console.log(`4. Returning ${results.length} songs to frontend.`);
-        return res.json({ songs: results, prompt });
+        console.log(`4. Returning ${uniqueResults.length} songs to frontend.`);
+        return res.json({ songs: uniqueResults, prompt });
 
     } catch (error) {
         console.error('An error occurred in the playlist controller:', error);

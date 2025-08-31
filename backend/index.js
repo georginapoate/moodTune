@@ -22,8 +22,8 @@ app.use((req, res, next) => {
 
 // Configure CORS to allow requests from your frontend
 app.use(cors({
-  origin: 'http://127.0.0.1:3000', // Your Vite frontend URL
-  credentials: true, // This allows cookies to be sent and received
+  origin: 'http://127.0.0.1:3000',
+  credentials: true,
 }));
 
 // Standard body and cookie parsers
@@ -46,23 +46,17 @@ app.get('/', (req, res) => {
   res.send('Hello World! Backend is up.');
 });
 
-// --- SERVER STARTUP LOGIC ---
 const startServer = async () => {
   try {
-    // 1. Connect to the database FIRST. This is an awaitable promise.
     await connectDB();
-    
-    // 2. ONLY AFTER the database is connected, start listening for requests.
-    // The process will now stay alive because of this listener.
     app.listen(PORT, host, () => {
       console.log(`✅ Server is running and listening on http://${host}:${PORT}`);
       console.log("Database connection is successful. Ready to accept requests.");
     });
   } catch (error) {
     console.error("❌ Failed to start the server:", error);
-    process.exit(1); // Exit the process with an error code
+    process.exit(1);
   }
 };
 
-// --- EXECUTE THE STARTUP ---
 startServer();
