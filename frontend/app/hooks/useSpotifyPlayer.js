@@ -32,8 +32,6 @@ export default function useSpotifyPlayer({ getAccessToken, enabled }) {
     }
 
     window.onSpotifyWebPlaybackSDKReady = async () => {
-      const spotifyToken = await getAccessToken() // MUST be fresh & include 'streaming' + playback scopes
-
       const p = new window.Spotify.Player({
         name: "povTunes Player",
         getOAuthToken: async (cb) => cb(await getAccessToken()),
@@ -83,6 +81,25 @@ export default function useSpotifyPlayer({ getAccessToken, enabled }) {
       if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [enabled, getAccessToken])
+
+  useEffect(() => {
+      if (player && state.isPlaying) {
+        if (pollRef.current) clearInterval(pollRef.current);
+
+        pollRef.current = setInterval(async () => {
+          const currentState = await player.getCurrentState();
+          if (currentState) {
+            setState(s => ({ ...s, progress: currentState.position }));
+          }
+        }, 1000); // 1 second
+      } else {
+        if (pollRef.current) clearInterval(pollRef.current);
+      }
+
+      return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
+      };
+    }, [player, state.isPlaying]);
 
   const playUri = async (deviceIdArg, uri) => {
     const token = await getAccessToken()
