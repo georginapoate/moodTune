@@ -11,7 +11,6 @@ const { connectDB } = require('./src/db/connection');
 // --- APP INITIALIZATION ---
 const app = express();
 const PORT = process.env.PORT || 5001;
-const host = '127.0.0.1';
 
 // --- MIDDLEWARE SETUP ---
 // This middleware runs for every request and is great for debugging
@@ -49,7 +48,7 @@ app.get('/', (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-    app.listen(PORT, host, () => {
+    app.listen(PORT, () => {
       console.log(`✅ Server is running and listening on http://${host}:${PORT}`);
       console.log("Database connection is successful. Ready to accept requests.");
     });
