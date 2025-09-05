@@ -7,8 +7,9 @@ A full-stack web application that generates a custom Spotify playlist based on a
 *   **Frontend:** Next.js, React
 *   **Backend:** Node.js, Express.js
 *   **APIs:**
-    *   OpenAI API (GPT-3.5-Turbo) for song suggestion
+    *   OpenAI API (GPT-3.5-Turbo) for embedding
     *   Spotify Web API for authentication and playlist creation
+    *   Last.FM for tags & summary retreival
 
 ---
 
