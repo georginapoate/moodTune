@@ -56,8 +56,6 @@ const spotifyCallback = async (req, res) => {
             code, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_CALLBACK_URL
         )
 
-        // res.redirect(`http://127.0.0.1:3000?access_token=${accessToken}&refresh_token=${refreshToken}`);
-
         const spotifyApi = getSpotifyApi(accessToken);
 
         const meResponse = await spotifyApi.getMe();
@@ -84,7 +82,7 @@ const spotifyCallback = async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
         
-        res.redirect(`http://127.0.0.1:3000/`);
+        res.redirect(process.env.FRONTEND_URL || `http://127.0.0.1:3000/`);
 
     } catch (error) {
 
