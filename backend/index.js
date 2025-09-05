@@ -21,7 +21,7 @@ app.use((req, res, next) => {
 
 // Configure CORS to allow requests from your frontend
 app.use(cors({
-  origin: 'http://127.0.0.1:3000',
+  origin: process.env.FRONTEND_URL || 'http://127.0.0.1:3000',
   credentials: true,
 }));
 
