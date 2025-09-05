@@ -82,7 +82,7 @@ export default function ProfilePage({ user, onLogout }) {
           <span>{user.display_name?.[0] || "U"}</span>
         )}
         </div>
-        <h1 className="text-3xl font-bold text-white mb-2">{user.display_name || "Music Lover"}</h1>
+        <h1 className="text-3xl font-bold text-white mb-2">{user.display_name || user.displayName || "Music Lover"}</h1>
         <p className="text-white/70 mb-6">{user.email}</p>
         <div className="flex items-center justify-center gap-4 text-sm text-white/60">
           <span className="flex items-center gap-2">
