@@ -46,16 +46,23 @@ app.get('/', (req, res) => {
 });
 
 const startServer = async () => {
+  console.log("Attempting to start the server...");
   try {
+    console.log("Connecting to the database...");
     await connectDB();
+    console.log("Database connection successful. Starting Express server...");
+    
     app.listen(PORT, () => {
-      console.log(`✅ Server is running and listening on http://${host}:${PORT}`);
-      console.log("Database connection is successful. Ready to accept requests.");
+      console.log(`✅ Server is now listening on port ${PORT}`);
+      console.log("Ready to accept requests.");
     });
+
   } catch (error) {
-    console.error("❌ Failed to start the server:", error);
+    console.error("❌ FATAL: Failed to start the server:", error);
     process.exit(1);
   }
 };
+
+startServer();
 
 startServer();
