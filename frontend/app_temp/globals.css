@@ -21,7 +21,7 @@
   --destructive: #be123c;
   --destructive-foreground: #ffffff;
   --border: #e5e7eb;
-  --input: #f1f5f9;
+  --input: #ca9ed3;
   --ring: rgba(5, 150, 105, 0.3);
   --chart-1: #059669;
   --chart-2: #10b981;
@@ -34,7 +34,7 @@
   --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #ec4899;
-  --sidebar-accent-foreground: #ffffff;
+  --sidebar-accent-foreground: #925697;
   --sidebar-border: #e5e7eb;
   --sidebar-ring: rgba(5, 150, 105, 0.3);
 }
