@@ -6,6 +6,21 @@ const { decrypt, encrypt } = require('../../utils/crypto');
 const { ObjectId } = require('mongodb');
 const { getDb } = require('../db/connection');
 
+const handleTokenRefresh = async (user, spotifyApi) => {
+    console.log("Access token expired or invalid. Attempting to refresh...");
+    const refreshToken = decrypt(user.refreshToken);
+    const data = await refreshAccessToken(refreshToken, process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
+    const newAccessToken = data.accessToken;
+
+    await getDb().collection('users').updateOne(
+        { _id: user._id },
+        { $set: { accessToken: encrypt(newAccessToken) } }
+    );
+
+    spotifyApi.setAccessToken(newAccessToken);
+    console.log("Token refreshed successfully.");
+};
+
 const generatePlaylist = async (req, res) => {
     const { prompt } = req.body;
 
@@ -44,25 +59,15 @@ try {
                     spotifyExternalUrl: spotifyMeta?.spotifyExternalUrl || null,
                 });
             }
-            // Returnăm rezultatele complete pentru a fi procesate mai departe
             return { songs: results, originalSongs: recommendedSongs };
         };
         let generationResult;
         try {
             generationResult = await performGeneration();
         } catch (err) {
-             if (err.message && err.message.toLowerCase().includes('token expired')) {
-                console.log("Access token expired. Attempting to refresh...");    
-                const refreshToken = decrypt(user.refreshToken);
-                const data = await refreshAccessToken(refreshToken, process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
-                const newAccessToken = data.accessToken;
-
-                await getDb().collection('users').updateOne(
-                    { _id: user._id },
-                    { $set: { accessToken: encrypt(newAccessToken) } }
-                );
-                spotifyApi.setAccessToken(newAccessToken);
-                console.log("Token refreshed successfully. Retrying playlist generation...");
+             if (err.statusCode === 401 || (err.message && err.message.toLowerCase().includes('token expired'))) {
+                await handleTokenRefresh(user, spotifyApi);
+                console.log("Retrying playlist generation...");
                 generationResult = await performGeneration();
             } else {
                 throw err;
@@ -85,7 +90,6 @@ try {
         return res.json({ songs: uniqueResults, prompt });
 
     } catch (error) {
-        // Acest bloc prinde erorile critice (ex: eșec la reînnoire, probleme cu DB etc.)
         console.error('A critical error occurred in the playlist controller:', error.message || error);
         res.status(500).json({ error: 'Failed to generate playlist.' });
     }

@@ -13,7 +13,7 @@ function getSpotifyApi(accessToken) {
   return new SpotifyWebApi({ accessToken });
 }
 
-const createSpotifyAuthorizeURL = (clientId, redirectUri, scopes) => {
+const createSpotifyAuthorizeURL = (clientId, redirectUri, scopes, state) => {
   const spotifyApi = new SpotifyWebApi({
     clientId: clientId,
     redirectUri: redirectUri,
