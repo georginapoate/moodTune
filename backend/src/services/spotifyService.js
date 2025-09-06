@@ -18,7 +18,7 @@ const createSpotifyAuthorizeURL = (clientId, redirectUri, scopes) => {
     clientId: clientId,
     redirectUri: redirectUri,
   });
-  return spotifyApi.createAuthorizeURL(scopes);
+  return spotifyApi.createAuthorizeURL(scopes, state);
 };
 
 const refreshAccessToken = async (refreshToken, clientId, clientSecret) => {

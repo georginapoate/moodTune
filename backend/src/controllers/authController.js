@@ -19,7 +19,9 @@ const {
 
 
 const spotifyLogin = (req, res) => {
-    const authorizeURL = createSpotifyAuthorizeURL(SPOTIFY_CLIENT_ID, SPOTIFY_CALLBACK_URL, scopes);
+    const state = crypto.randomBytes(16).toString('hex');
+    res.cookie('spotify_auth_state', state, { httpOnly: true});
+    const authorizeURL = createSpotifyAuthorizeURL(SPOTIFY_CLIENT_ID, SPOTIFY_CALLBACK_URL, scopes, state);
     res.redirect(authorizeURL);
 };
 
@@ -45,7 +47,13 @@ const refreshToken = async (req, res) => {
 }
 
 const spotifyCallback = async (req, res) => {
-    const { code } = req.query;
+    const { code, state } = req.query;
+    const storedState = req.cookies ? req.cookies['spotify_auth_state'] : null;
+
+    if (state === null || state !== storedState) {
+        return res.status(400).send('State mismatch');
+    }
+    res.clearCookie('spotify_auth_state');
 
     if (!code) {
         return res.status(400).send('Spotify authorization code is missing.');

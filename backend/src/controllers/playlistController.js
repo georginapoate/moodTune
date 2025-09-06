@@ -86,7 +86,7 @@ try {
 
     } catch (error) {
         // Acest bloc prinde erorile critice (ex: eșec la reînnoire, probleme cu DB etc.)
-        console.error('A critical error occurred in the playlist controller:', error.body || error);
+        console.error('A critical error occurred in the playlist controller:', error.message || error);
         res.status(500).json({ error: 'Failed to generate playlist.' });
     }
 };
