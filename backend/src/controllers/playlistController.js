@@ -1,5 +1,5 @@
 // backend/controllers/playlistController.js
-const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks} = require('../services/spotifyService');
+const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks, refreshAccessToken} = require('../services/spotifyService');
 const { findSimilarSongs, findUserById, savePromptToHistory  } = require('../services/dbService');
 const { getOpenAIEmbedding } = require('../services/openaiService');
 const { decrypt, encrypt } = require('../../utils/crypto');
