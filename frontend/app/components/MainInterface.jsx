@@ -138,7 +138,6 @@ export default function MainInterface({ user }) {
           </button>
         </form>
 
-        {/* Error message */}
         {error && (
           <div className="glass-card p-6 rounded-2xl border-destructive/50">
             <p className="text-destructive-foreground font-medium">Error: {error}</p>
@@ -148,20 +147,34 @@ export default function MainInterface({ user }) {
         {/* Success message */}
         {playlistUrl && (
           <div className="glass-card p-8 rounded-2xl text-center space-y-4">
-            <h3 className="text-2xl font-bold text-white">Your vibey playlist was successfully saved! 🎉</h3>
+            <h3 className="text-2xl font-bold text-white">🎧Your vibey little playlist 🎶 was successfully saved! 🎉</h3>
             <a
               href={playlistUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block bg-white text-primary font-semibold py-3 px-8 rounded-xl hover:bg-white/90 transition-all hover-lift"
             >
-              Open on Spotify
+              Open it on Spotify ✨
             </a>
           </div>
         )}
 
-        {/* Song preview list */}
-        {songs.length > 0 && !playlistUrl && (
+         {isLoading && (
+          <div className="glass-card p-8 rounded-2xl space-y-6">
+            <div className="h-8 w-1/2 bg-white/20 rounded-lg mx-auto animate-pulse"></div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="bg-white/5 rounded-xl p-4 animate-pulse">
+                  <div className="w-full aspect-square bg-white/10 rounded-lg mb-4"></div>
+                  <div className="h-5 w-3/4 bg-white/10 rounded-lg mb-2"></div>
+                  <div className="h-4 w-1/2 bg-white/10 rounded-lg"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && songs.length > 0 && !playlistUrl && (
           <SongPreviewList
             songs={songs}
             prompt={originalPrompt}

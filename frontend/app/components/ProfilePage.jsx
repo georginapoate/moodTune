@@ -69,14 +69,15 @@ export default function ProfilePage({ user, onLogout }) {
 
   return (
     <div className="w-full max-w-4xl mx-auto animate-fade-in space-y-8">
-      {/* Profile header */}
       <div className="glass-card p-8 rounded-2xl text-center">
         <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">
         {user.profileImageUrl ? (
-          <img
+          <Image
             src={user.profileImageUrl}
             alt={`Profile picture of ${user.display_name}`}
-            className="w-full h-full object-cover"
+            width={30}
+            height={30}
+            className="w-full h-full object-cover rounded-lg"
           />
         ) : (
           <span>{user.display_name?.[0] || "U"}</span>

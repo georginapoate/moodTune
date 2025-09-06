@@ -54,12 +54,25 @@ export default function Home() {
   }
 
   if (loading) {
+    // Afișăm o structură "fantomă" care seamănă cu cea finală
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass-card p-8 rounded-2xl">
-          <div className="animate-spin w-8 h-8 border-4 border-white/30 border-t-white rounded-full mx-auto"></div>
-          <p className="text-white mt-4 font-medium">Loading your vibe...</p>
-        </div>
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Header fantomă */}
+        <header className="absolute top-0 left-0 right-0 z-20 p-6 flex justify-between items-center">
+          <div className="h-8 w-32 bg-white/10 rounded-lg animate-pulse"></div>
+          <div className="w-12 h-12 bg-white/20 rounded-full animate-pulse"></div>
+        </header>
+        
+        {/* MainInterface fantomă */}
+        <main className="min-h-screen flex items-center justify-center p-6">
+          <div className="w-full max-w-4xl mx-auto space-y-8">
+            <div className="glass-card p-8 rounded-4xl space-y-6 animate-pulse">
+              <div className="h-7 w-1/3 bg-white/20 rounded-lg"></div>
+              <div className="h-32 w-full bg-white/10 rounded-xl"></div>
+              <div className="h-14 w-full bg-white/20 rounded-xl"></div>
+            </div>
+          </div>
+        </main>
       </div>
     )
   }
@@ -91,9 +104,11 @@ export default function Home() {
                 "×"
               ) : user.profileImageUrl ? (
                 // Otherwise, if a profile image exists, show it
-                <img
+                <Image
                   src={user.profileImageUrl}
                   alt="Profile"
+                  width={200}
+                  height={200}
                   className="w-full h-full object-cover"
                 />
               ) : (

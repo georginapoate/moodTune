@@ -17,10 +17,12 @@ export default function SongItem({ song, onRemove, isPlaying, onPlayPause, isPre
       className={`bg-white/5 backdrop-blur-sm rounded-xl p-4 hover:bg-white/10 transition-all hover-lift ${isPlaying ? "ring-2 ring-accent" : ""}`}
     >
       <div className="relative mb-4">
-        <img
+        <Image
           src={song.albumImage || "/placeholder.svg"}
           alt={song.album}
-          className="w-full aspect-square object-cover rounded-lg"
+          width={200}
+          height={200}
+          className="w-full h-full aspect-square object-cover rounded-lg"
         />
         <button
           onClick={handlePlay}
