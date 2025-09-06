@@ -1,165 +1,169 @@
-// backend/controllers/playlistController.js
-const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks, refreshAccessToken } = require('../services/spotifyService');
-const { findSimilarSongs, findUserById, savePromptToHistory } = require('../services/dbService');
-const { getOpenAIEmbedding } = require('../services/openaiService');
-const { decrypt, encrypt } = require('../../utils/crypto'); // Asigură-te că ai importat și 'encrypt'
-const { ObjectId } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
+const { encrypt } = require('../../utils/crypto');
 const { getDb } = require('../db/connection');
 
-const generatePlaylist = async (req, res) => {
-    const { prompt } = req.body;
-    if (!prompt) {
-        return res.status(400).json({ error: 'A prompt is required.' });
-    }
+const MONGO_URI = process.env.MONGO_URI;
+const DB_NAME = 'moodtunes';
+const SONGS_COLLECTION = 'songs';
+const USERS_COLLECTION = 'users';
 
-    try {
-        const user = await findUserById(req.userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
+let client;
 
-        let accessToken = decrypt(user.accessToken);
-        let spotifyApi = getSpotifyApi(accessToken);
+async function findSimilarSongs(promptEmbedding) {
+    const collection = await getDb().collection(SONGS_COLLECTION);
 
-        const performGeneration = async () => {
-            console.log("1. Generating embedding for prompt...");
-            const promptEmbedding = await getOpenAIEmbedding(prompt);
-            const recommendedSongs = await findSimilarSongs(promptEmbedding);
-
-            if (recommendedSongs.length === 0) {
-                return { error: 'Could not find any matching songs.', status: 404 };
+    const searchPipeline = [
+        {
+            '$vectorSearch': {
+                'index': 'vector_index',
+                'path': 'embedding',
+                'queryVector': promptEmbedding,
+                'numCandidates': 100,
+                'limit': 15
             }
-            console.log(`2. Found ${recommendedSongs.length} recommended songs.`);
-
-            const results = [];
-            console.log(`3. Fetching Spotify metadata for each song...`);
-            for (const doc of recommendedSongs) {
-                const spotifyMeta = await searchTrackOnSpotify(spotifyApi, doc.artist, doc.title);
-                results.push({
-                    artist: doc.artist, title: doc.title, album: doc.album, score: doc.score,
-                    spotifyTrackId: spotifyMeta?.spotifyTrackId || null,
-                    spotifyUri: spotifyMeta?.spotifyUri || null,
-                    previewUrl: spotifyMeta?.previewUrl || null,
-                    albumImage: spotifyMeta?.albumImage || null,
-                    spotifyExternalUrl: spotifyMeta?.spotifyExternalUrl || null,
-                });
-            }
-            return { songs: results, originalSongs: recommendedSongs };
-        };
-        
-        let generationResult;
-        try {
-            generationResult = await performGeneration();
-        } catch (err) {
-            // --- MODIFICAREA CRITICĂ ESTE AICI ---
-            // Verificăm direct mesajul de eroare pentru textul "token expired".
-            // Aceasta este o metodă mult mai fiabilă.
-            if (err.message && err.message.toLowerCase().includes('token expired')) {
-                console.log("Access token expired. Attempting to refresh...");
-                
-                const refreshToken = decrypt(user.refreshToken);
-                const data = await refreshAccessToken(refreshToken, process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
-                const newAccessToken = data.accessToken;
-
-                // Actualizăm token-ul nou, criptat, în baza de date
-                await getDb().collection('users').updateOne(
-                    { _id: user._id },
-                    { $set: { accessToken: encrypt(newAccessToken) } }
-                );
-
-                // Actualizăm instanța API cu noul token și reîncercăm
-                spotifyApi.setAccessToken(newAccessToken);
-                console.log("Token refreshed successfully. Retrying playlist generation...");
-                generationResult = await performGeneration();
-            } else {
-                // Dacă eroarea este alta, o aruncăm mai departe
-                throw err;
+        },
+        {
+            '$project': {
+                'artist': 1,
+                'title': 1,
+                'album': 1,
+                'score': { '$meta': 'vectorSearchScore' }
             }
         }
+    ];
 
-        if (generationResult.error) {
-            return res.status(generationResult.status).json({ error: generationResult.error });
-        }
-        
-        const uniqueResults = Array.from(new Map(generationResult.songs.filter(s => s.spotifyTrackId).map(s => [s.spotifyTrackId, s])).values());
-        
-        if (uniqueResults.length > 0) {
-            // Folosim `generationResult.originalSongs` pentru a păstra ID-urile corecte din DB
-            const songIds = generationResult.originalSongs.map(song => new ObjectId(song._id));
-            await savePromptToHistory(req.userId, prompt, songIds);
-        }
+    return collection.aggregate(searchPipeline).toArray();
+}
 
-        console.log(`4. Returning ${uniqueResults.length} unique songs to frontend.`);
-        return res.json({ songs: uniqueResults, prompt });
+async function seedSongsCollection(songDocuments) {
 
-    } catch (error) {
-        console.error('A critical error occurred in the playlist controller:', error.message || error);
-        res.status(500).json({ error: 'Failed to generate playlist.' });
-    }
-};
-
-const createSpotifyPlaylist = async (req, res) => {
-    // NOTĂ: Logica de reînnoire a token-ului ar trebui aplicată și aici într-un mod similar.
-    // Deocamdată, o las neschimbată pentru a rezolva problema principală.
-    try {
-        const { songs, prompt } = req.body;
-        if ( !songs || !prompt) {
-            return res.status(400).json({ error: 'Songs, and prompt are required.' });
-        }
-
-        const user = await findUserById(req.userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
-
-        const accessToken = decrypt(user.accessToken);
-        const playlist = await createPlaylistFromTracks(accessToken, songs, prompt);
-
-        res.json({
-            success: true,
-            playlistUrl: playlist.playlistUrl,
-            addedTracks: playlist.tracks.length,
-        });
-    } catch (error) {
-        console.error('Error in savePlaylist:', error?.message || error);
-        return res.status(500).json({ error: 'Failed to create playlist.' });
+    if (!songDocuments || songDocuments.length === 0) {
+        console.log(`> No song documents provided to seed. Stopping the seed process.`);
+        return;
     }
 
-};
+    const collection = await getDb().collection(SONGS_COLLECTION);
+    console.log('> Seeding songs collection...');
 
-const deleteGeneratedPlaylist = async (req, res) => {
     try {
-        const { playlistId: promptId } = req.params;
-        const userId = req.userId;
+        await collection.createIndex({ artist: 1, title: 1 }, { unique: true });
+        console.log('  - Ensured unique index on { artist, title } exists.');
+    } catch (indexError) {
+        console.error('! Error creating unique index:', indexError.message);
+        return;
+    }
 
-        if (!ObjectId.isValid(promptId)) {
-            return res.status(400).json({ error: 'Invalid playlist history ID format.' });
-        }
+    const operations = songDocuments.map(doc => ({
+        updateOne: {
+        filter: { artist: doc.artist, title: doc.title }, 
+        update: { $set: doc },
+        upsert: true,
+        },
+    }));
 
-        const promptsCollection = getDb().collection('prompts');
-
-        const query = {
-            _id: new ObjectId(promptId),
-            userId: new ObjectId(userId)
-        };
-        console.log("Query for deletion:", query);
-
-        const result = await promptsCollection.deleteOne(query);
-        
-        console.log("Result from deleteOne:", result);
-        if (result.deletedCount === 1) {
-            res.status(200).json({ message: 'Playlist history successfully deleted.' });
-        } else {
-            res.status(404).json({ message: 'Playlist history not found or you do not have permission to delete it.' });
-        }
+    try {
+        const result = await collection.bulkWrite(operations);
+        console.log('> Bulk upsert operation complete.');
+        console.log(`  - Songs freshly inserted: ${result.upsertedCount}`);
+        console.log(`  - Existing songs updated: ${result.modifiedCount}`);
+        console.log(`  - Total songs matched: ${result.matchedCount}`);
     } catch (error) {
-        console.error('Error in deleteGeneratedPlaylist controller:', error.message);
-        res.status(500).json({ error: 'Failed to delete playlist.' });
+        console.error('! An error occurred during the bulk write operation:', error);
     }
 }
 
+async function findOrCreateUser(spotifyProfile, tokens) {
+  const usersCollection = getDb().collection('users');
+  const { id: spotifyId, display_name, email, images, product, followers } = spotifyProfile;
+
+  try {
+    await usersCollection.createIndex({ spotifyId: 1 }, { unique: true });
+    console.log("Ensured unique index on 'spotifyId' exists for the users collection.");
+  } catch (indexError) {
+    console.warn("Could not create unique index on users (it likely already exists).");
+  }
+
+  const encryptedAccessToken = encrypt(tokens.accessToken);
+  const encryptedRefreshToken = encrypt(tokens.refreshToken);
+
+  console.log(`Searching for user with Spotify ID: ${spotifyId}`);
+  const existingUser = await usersCollection.findOne({ spotifyId: spotifyId });
+
+  if (existingUser) {
+    console.log(`User found: ${existingUser.displayName}. Updating tokens.`);
+    
+    await usersCollection.updateOne(
+      { _id: existingUser._id },
+      {
+        $set: {
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          displayName: display_name,
+          profileImageUrl: images?.[0]?.url || null,
+          product: product,
+          followers: followers,
+        }
+      }
+    );
+    
+    const updatedUser = { ...existingUser,
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken
+    };
+    return updatedUser;
+  
+  } else {
+    console.log(`User not found. Creating new user: ${display_name}`);
+    
+    const newUserDocument = {
+      spotifyId: spotifyId,
+      displayName: display_name,
+      email: email,
+      profileImageUrl: images?.[0]?.url || null,
+      product: product, // Add this
+      followers: followers, // Add this
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken,
+      createdAt: new Date(),
+    };
+
+    const insertResult = await usersCollection.insertOne(newUserDocument);
+    
+    if (insertResult.insertedId) {
+      console.log(`Successfully created new user with DB ID: ${insertResult.insertedId}`);
+      return { ...newUserDocument, _id: insertResult.insertedId };
+    } else {
+      console.error("!!! CRITICAL: Failed to insert new user into the database. !!!");
+      return null;
+    }
+  }
+}
+
+async function findUserById(userId) {
+  const usersCollection = await getDb().collection(USERS_COLLECTION);
+  return usersCollection.findOne({ _id: new ObjectId(userId) });
+}
+
+async function savePromptToHistory(userId, promptText, songIds) {
+  try {
+    const promptsCollection = getDb().collection('prompts');
+    await promptsCollection.insertOne({
+      userId: new ObjectId(userId),
+      promptText: promptText,
+      generatedSongIds: songIds,
+      createdAt: new Date()
+    });
+    console.log(`Successfully saved prompt history for user ${userId}`);
+  } catch (error) {
+    console.error("Error saving prompt to history:", error);
+  }
+}
+
+
 module.exports = {
-    generatePlaylist,
-    createSpotifyPlaylist,
-    deleteGeneratedPlaylist
-};
+    findSimilarSongs,
+    seedSongsCollection,
+    savePromptToHistory,
+    findOrCreateUser,
+    findUserById,
+}
