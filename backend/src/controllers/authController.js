@@ -21,7 +21,10 @@ const {
 
 const spotifyLogin = (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
-    res.cookie('spotify_auth_state', state, { httpOnly: true});
+    
+    req.session.spotify_auth_state = state;
+
+    // res.cookie('spotify_auth_state', state, { httpOnly: true});
     const authorizeURL = createSpotifyAuthorizeURL(SPOTIFY_CLIENT_ID, SPOTIFY_CALLBACK_URL, scopes, state);
     res.redirect(authorizeURL);
 };
@@ -49,7 +52,8 @@ const refreshToken = async (req, res) => {
 
 const spotifyCallback = async (req, res) => {
     const { code, state } = req.query;
-    const storedState = req.cookies ? req.cookies['spotify_auth_state'] : null;
+    // const storedState = req.cookies ? req.cookies['spotify_auth_state'] : null;
+    const storedState = req.session ? req.session.spotify_auth_state : null;
 
     if (state === null || state !== storedState) {
         return res.status(400).send('State mismatch');

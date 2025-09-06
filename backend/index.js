@@ -7,6 +7,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const { connectDB } = require('./src/db/connection');
+const session = require('express-session');
 
 // --- APP INITIALIZATION ---
 const app = express();
@@ -23,6 +24,18 @@ app.use((req, res, next) => {
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://127.0.0.1:3000',
   credentials: true,
+}));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET, // Adaugă o variabilă SESSION_SECRET în .env!
+  resave: false,
+  saveUninitialized: true,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax', // Poți folosi 'lax' aici
+    domain: 'povtunes.space' // Opțional, dar bun pentru consistență
+  }
 }));
 
 // Standard body and cookie parsers
