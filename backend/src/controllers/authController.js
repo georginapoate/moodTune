@@ -1,6 +1,7 @@
 // backend/controllers/authController.js
 const SpotifyWebApi = require('spotify-web-api-node');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { findOrCreateUser, findUserById} = require('../services/dbService');
 const { getSpotifyApi } = require('../services/spotifyService');
 const { decrypt } = require('../../utils/crypto');
