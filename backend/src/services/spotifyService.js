@@ -77,7 +77,7 @@ const searchTrackOnSpotify = async (spotifyApi, artist, title) => {
       artists: item.artists.map(a => a.name).join(', ')
     };
   } catch (err) {
-    console.error('searchTrackOnSpotify error:', err?.message || err);
+    console.error('searchTrackOnSpotify error:', err?.message || err.body);
     return null;
   }
 };

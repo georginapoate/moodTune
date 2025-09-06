@@ -12,63 +12,96 @@ const generatePlaylist = async (req, res) => {
     if (!prompt) {
         return res.status(400).json({ error: 'A prompt is required.' });
     }
-
-    const user = await findUserById(req.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
-    }
-
-    const accessToken = decrypt(user.accessToken);
-    const spotifyApi = getSpotifyApi(accessToken);
-
-    try {
-        console.log("1. Generating embedding for prompt...");
-        const promptEmbedding = await getOpenAIEmbedding(prompt);
-        const recommendedSongs = await findSimilarSongs(promptEmbedding);
-
-        if (recommendedSongs.length === 0) {
-            return res.status(404).json({ error: 'Could not find any matching songs.' });
-        }
-        console.log(`2. Found ${recommendedSongs.length} recommended songs.`);
-
-        const results = [];
-
-        console.log(`3. Fetching Spotify metadata for each song...`);
-
-        for (const doc of recommendedSongs) {
-            const spotifyMeta = await searchTrackOnSpotify(spotifyApi, doc.artist, doc.title);
-            results.push({
-                artist: doc.artist,
-                title: doc.title,
-                album: doc.album || null,
-                score: doc.score || null,
-                spotifyTrackId: spotifyMeta?.spotifyTrackId || null,
-                spotifyUri: spotifyMeta?.spotifyUri || null,
-                previewUrl: spotifyMeta?.previewUrl || null,
-                albumImage: spotifyMeta?.albumImage || 'https://picsum.photos/200',
-                spotifyExternalUrl: spotifyMeta?.spotifyExternalUrl || null,
-            });
+try {
+        const user = await findUserById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
         }
 
-        console.log(`4. De-duplicating ${results.length} songs based on Spotify Track ID...`);
-        const uniqueSongsMap = new Map();
-        results.forEach(song => {
-          // We only add songs that have a valid Spotify ID and are not already in our map
-          if (song.spotifyTrackId && !uniqueSongsMap.has(song.spotifyTrackId)) {
-            uniqueSongsMap.set(song.spotifyTrackId, song);
-          }
-        });
-        const uniqueResults = Array.from(uniqueSongsMap.values());
+        // Inițializăm token-ul și API-ul. Folosim 'let' pentru a le putea modifica ulterior.
+        let accessToken = decrypt(user.accessToken);
+        let spotifyApi = getSpotifyApi(accessToken);
 
+        // --- ÎNCAPSULĂM LOGICA DE GENERARE PENTRU A O PUTEA REÎNCERCA ---
+        const performGeneration = async () => {
+            console.log("1. Generating embedding for prompt...");
+            const promptEmbedding = await getOpenAIEmbedding(prompt);
+            const recommendedSongs = await findSimilarSongs(promptEmbedding);
+
+            if (recommendedSongs.length === 0) {
+                // Returnăm un obiect special pentru a fi gestionat mai jos, nu un răspuns HTTP direct
+                return { error: 'Could not find any matching songs.', status: 404 };
+            }
+            console.log(`2. Found ${recommendedSongs.length} recommended songs.`);
+
+            const results = [];
+            console.log(`3. Fetching Spotify metadata for each song...`);
+            for (const doc of recommendedSongs) {
+                // Aici poate apărea eroarea de token expirat
+                const spotifyMeta = await searchTrackOnSpotify(spotifyApi, doc.artist, doc.title);
+                results.push({
+                    artist: doc.artist, title: doc.title, album: doc.album, score: doc.score,
+                    spotifyTrackId: spotifyMeta?.spotifyTrackId || null,
+                    spotifyUri: spotifyMeta?.spotifyUri || null,
+                    previewUrl: spotifyMeta?.previewUrl || null,
+                    albumImage: spotifyMeta?.albumImage || null,
+                    spotifyExternalUrl: spotifyMeta?.spotifyExternalUrl || null,
+                });
+            }
+            // Returnăm rezultatele complete pentru a fi procesate mai departe
+            return { songs: results, originalSongs: recommendedSongs };
+        };
+        // --- SFÂRȘITUL FUNCȚIEI ÎNCAPSULATE ---
+
+
+        let generationResult;
+        try {
+            // Încercăm să generăm playlist-ul prima dată
+            generationResult = await performGeneration();
+        } catch (err) {
+            // Verificăm DACĂ eroarea este specifică unui token expirat (status 401)
+            if (err.body?.error?.status === 401) {
+                console.log("Access token expired. Attempting to refresh...");
+                
+                const refreshToken = decrypt(user.refreshToken);
+                const data = await refreshAccessToken(refreshToken, process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
+                const newAccessToken = data.accessToken;
+
+                // CRUCIAL: Actualizăm token-ul nou, criptat, în baza de date pentru utilizări viitoare
+                await getDb().collection('users').updateOne(
+                    { _id: user._id },
+                    { $set: { accessToken: encrypt(newAccessToken) } }
+                );
+
+                // Actualizăm instanța API cu noul token și reîncercăm generarea
+                spotifyApi.setAccessToken(newAccessToken);
+                console.log("Token refreshed successfully. Retrying playlist generation...");
+                generationResult = await performGeneration();
+            } else {
+                // Dacă este orice alt tip de eroare, o aruncăm pentru a fi prinsă de blocul catch principal
+                throw err;
+            }
+        }
+
+        // Verificăm dacă funcția de generare a returnat o eroare controlată (ex: nicio melodie găsită)
+        if (generationResult.error) {
+            return res.status(generationResult.status).json({ error: generationResult.error });
+        }
+        
+        // De-duplicarea și salvarea în istoric se fac pe rezultatul final, reușit
+        const uniqueResults = Array.from(new Map(generationResult.songs.filter(s => s.spotifyTrackId).map(s => [s.spotifyTrackId, s])).values());
+        
         if (uniqueResults.length > 0) {
-            const songIds = recommendedSongs.map(song => new ObjectId(song._id));
+            const songIds = generationResult.originalSongs.map(song => new ObjectId(song._id));
             await savePromptToHistory(req.userId, prompt, songIds);
         }
-        console.log(`4. Returning ${uniqueResults.length} songs to frontend.`);
+
+        console.log(`4. Returning ${uniqueResults.length} unique songs to frontend.`);
         return res.json({ songs: uniqueResults, prompt });
 
     } catch (error) {
-        console.error('An error occurred in the playlist controller:', error);
+        // Acest bloc prinde erorile critice (ex: eșec la reînnoire, probleme cu DB etc.)
+        console.error('A critical error occurred in the playlist controller:', error.body || error);
         res.status(500).json({ error: 'Failed to generate playlist.' });
     }
 };
