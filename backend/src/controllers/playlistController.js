@@ -2,7 +2,7 @@
 const { getSpotifyApi, searchTrackOnSpotify, createPlaylistFromTracks} = require('../services/spotifyService');
 const { findSimilarSongs, findUserById, savePromptToHistory  } = require('../services/dbService');
 const { getOpenAIEmbedding } = require('../services/openaiService');
-const { decrypt } = require('../../utils/crypto');
+const { decrypt, encrypt } = require('../../utils/crypto');
 const { ObjectId } = require('mongodb');
 const { getDb } = require('../db/connection');
 
@@ -18,7 +18,6 @@ try {
             return res.status(404).json({ error: 'User not found.' });
         }
 
-        // Inițializăm token-ul și API-ul. Folosim 'let' pentru a le putea modifica ulterior.
         let accessToken = decrypt(user.accessToken);
         let spotifyApi = getSpotifyApi(accessToken);
 
@@ -51,7 +50,6 @@ try {
             // Returnăm rezultatele complete pentru a fi procesate mai departe
             return { songs: results, originalSongs: recommendedSongs };
         };
-        // --- SFÂRȘITUL FUNCȚIEI ÎNCAPSULATE ---
 
 
         let generationResult;
@@ -67,7 +65,6 @@ try {
                 const data = await refreshAccessToken(refreshToken, process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
                 const newAccessToken = data.accessToken;
 
-                // CRUCIAL: Actualizăm token-ul nou, criptat, în baza de date pentru utilizări viitoare
                 await getDb().collection('users').updateOne(
                     { _id: user._id },
                     { $set: { accessToken: encrypt(newAccessToken) } }
