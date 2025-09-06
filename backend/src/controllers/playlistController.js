@@ -90,7 +90,7 @@ try {
         return res.json({ songs: uniqueResults, prompt });
 
     } catch (error) {
-        console.error('A critical error occurred in the playlist controller:', error.message || error);
+        console.error('A critical error occurred in the playlist controller:', error.message, error.body || error);
         res.status(500).json({ error: 'Failed to generate playlist.' });
     }
 };

@@ -73,70 +73,75 @@ async function seedSongsCollection(songDocuments) {
 }
 
 async function findOrCreateUser(spotifyProfile, tokens) {
-  const usersCollection = getDb().collection('users');
-  const { id: spotifyId, display_name, email, images, product, followers } = spotifyProfile;
+    const usersCollection = getDb().collection(USERS_COLLECTION);
+    const { id: spotifyId, display_name, email, images, product, followers } = spotifyProfile;
 
-  try {
-    await usersCollection.createIndex({ spotifyId: 1 }, { unique: true });
-    console.log("Ensured unique index on 'spotifyId' exists for the users collection.");
-  } catch (indexError) {
-    console.warn("Could not create unique index on users (it likely already exists).");
-  }
-
-  const encryptedAccessToken = encrypt(tokens.accessToken);
-  const encryptedRefreshToken = encrypt(tokens.refreshToken);
-
-  console.log(`Searching for user with Spotify ID: ${spotifyId}`);
-  const existingUser = await usersCollection.findOne({ spotifyId: spotifyId });
-
-  if (existingUser) {
-    console.log(`User found: ${existingUser.displayName}. Updating tokens.`);
-    
-    await usersCollection.updateOne(
-      { _id: existingUser._id },
-      {
-        $set: {
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
-          displayName: display_name,
-          profileImageUrl: images?.[0]?.url || null,
-          product: product,
-          followers: followers,
-        }
-      }
-    );
-    
-    const updatedUser = { ...existingUser,
-      accessToken: encryptedAccessToken,
-      refreshToken: encryptedRefreshToken
-    };
-    return updatedUser;
-  
-  } else {
-    console.log(`User not found. Creating new user: ${display_name}`);
-    
-    const newUserDocument = {
-      spotifyId: spotifyId,
-      displayName: display_name,
-      email: email,
-      profileImageUrl: images?.[0]?.url || null,
-      product: product, // Add this
-      followers: followers, // Add this
-      accessToken: encryptedAccessToken,
-      refreshToken: encryptedRefreshToken,
-      createdAt: new Date(),
-    };
-
-    const insertResult = await usersCollection.insertOne(newUserDocument);
-    
-    if (insertResult.insertedId) {
-      console.log(`Successfully created new user with DB ID: ${insertResult.insertedId}`);
-      return { ...newUserDocument, _id: insertResult.insertedId };
-    } else {
-      console.error("!!! CRITICAL: Failed to insert new user into the database. !!!");
-      return null;
+    try {
+        await usersCollection.createIndex({ spotifyId: 1 }, { unique: true });
+    } catch (indexError) {
+        // Ignorăm eroarea, cel mai probabil indexul există deja
     }
-  }
+
+    const encryptedAccessToken = encrypt(tokens.accessToken);
+    const newEncryptedRefreshToken = tokens.refreshToken ? encrypt(tokens.refreshToken) : null;
+
+    console.log(`Searching for user with Spotify ID: ${spotifyId}`);
+    const existingUser = await usersCollection.findOne({ spotifyId: spotifyId });
+
+    if (existingUser) {
+        console.log(`User found: ${existingUser.displayName}. Updating profile and tokens.`);
+        
+        // 1. Construim dinamic obiectul de actualizare
+        const updateFields = {
+            accessToken: encryptedAccessToken,
+            displayName: display_name,
+            profileImageUrl: images?.[0]?.url || null,
+            product: product,
+            followers: followers,
+        };
+
+        // 2. Adăugăm refreshToken DOAR dacă am primit unul nou de la Spotify
+        if (newEncryptedRefreshToken) {
+            updateFields.refreshToken = newEncryptedRefreshToken;
+            console.log('  - A new refresh token was provided. Updating it.');
+        } else {
+            console.log('  - No new refresh token provided. Keeping the old one.');
+        }
+
+        // 3. Executăm actualizarea o singură dată
+        await usersCollection.updateOne(
+            { _id: existingUser._id },
+            { $set: updateFields }
+        );
+        
+        // 4. Returnăm documentul complet actualizat din baza de date
+        return usersCollection.findOne({ _id: existingUser._id });
+    
+    } else {
+        console.log(`User not found. Creating new user: ${display_name}`);
+        
+        const newUserDocument = {
+            spotifyId: spotifyId,
+            displayName: display_name,
+            email: email,
+            profileImageUrl: images?.[0]?.url || null,
+            product: product,
+            followers: followers,
+            accessToken: encryptedAccessToken,
+            refreshToken: newEncryptedRefreshToken, // Aici e ok să fie null dacă nu a fost primit
+            createdAt: new Date(),
+        };
+
+        const insertResult = await usersCollection.insertOne(newUserDocument);
+        
+        if (insertResult.insertedId) {
+            console.log(`Successfully created new user with DB ID: ${insertResult.insertedId}`);
+            return { ...newUserDocument, _id: insertResult.insertedId };
+        } else {
+            console.error("!!! CRITICAL: Failed to insert new user into the database. !!!");
+            return null;
+        }
+    }
 }
 
 async function findUserById(userId) {
