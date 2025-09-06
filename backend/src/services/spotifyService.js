@@ -78,7 +78,7 @@ const searchTrackOnSpotify = async (spotifyApi, artist, title) => {
     };
   } catch (err) {
     console.error('searchTrackOnSpotify error:', err?.message || err.body);
-    return null;
+    throw err;
   }
 };
 const createPlaylistFromTracks = async (accessToken, recommendedSongs, prompt) => {

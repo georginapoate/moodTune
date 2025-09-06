@@ -51,7 +51,6 @@ try {
         try {
             generationResult = await performGeneration();
         } catch (err) {
-            // Verificăm DACĂ eroarea este specifică unui token expirat (status 401)
              if (err.message && err.message.toLowerCase().includes('token expired')) {
                 console.log("Access token expired. Attempting to refresh...");    
                 const refreshToken = decrypt(user.refreshToken);
@@ -62,18 +61,14 @@ try {
                     { _id: user._id },
                     { $set: { accessToken: encrypt(newAccessToken) } }
                 );
-
-                // Actualizăm instanța API cu noul token și reîncercăm generarea
                 spotifyApi.setAccessToken(newAccessToken);
                 console.log("Token refreshed successfully. Retrying playlist generation...");
                 generationResult = await performGeneration();
             } else {
-                // Dacă este orice alt tip de eroare, o aruncăm pentru a fi prinsă de blocul catch principal
                 throw err;
             }
         }
 
-        // Verificăm dacă funcția de generare a returnat o eroare controlată (ex: nicio melodie găsită)
         if (generationResult.error) {
             return res.status(generationResult.status).json({ error: generationResult.error });
         }
