@@ -5,7 +5,6 @@ import LandingPage from "./components/LandingPage"
 import LoginModal from "./components/LoginModal"
 import MainInterface from "./components/MainInterface"
 import ProfilePage from "./components/ProfilePage"
-import Image from "next/image"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
@@ -105,7 +104,7 @@ export default function Home() {
                 "×"
               ) : user.profileImageUrl ? (
                 // Otherwise, if a profile image exists, show it
-                <Image
+                <img
                   src={user.profileImageUrl}
                   alt="Profile"
                   width={200}

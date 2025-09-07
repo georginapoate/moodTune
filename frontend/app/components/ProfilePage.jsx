@@ -3,7 +3,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Image from "next/image"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
@@ -73,7 +72,7 @@ export default function ProfilePage({ user, onLogout }) {
       <div className="glass-card p-8 rounded-2xl text-center">
         <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">
         {user.profileImageUrl ? (
-          <Image
+          <img
             src={user.profileImageUrl}
             alt={`Profile picture of ${user.display_name}`}
             width={30}
