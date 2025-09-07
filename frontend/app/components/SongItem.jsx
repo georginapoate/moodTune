@@ -1,6 +1,7 @@
 // song item component
 
 "use client"
+import Image from "next/image"
 
 export default function SongItem({ song, onRemove, isPlaying, onPlayPause, isPremium }) {
   const canPlay = (isPremium && song.spotifyUri) || (!isPremium && song.previewUrl)

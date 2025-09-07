@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
