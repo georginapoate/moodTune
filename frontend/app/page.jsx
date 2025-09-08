@@ -17,48 +17,47 @@ export default function Home() {
 useEffect(() => {
   const finalizeLogin = async () => {
     const url = new URL(window.location.href)
-    const error = url.searchParams.get("error")
-
-    if (error === "auth_failed") {
-      console.error("Spotify login failed. Please try again.")
-      setShowLoginModal(true)
-      url.searchParams.delete("error")
-      window.history.replaceState({}, document.title, url.toString())
-    }
-
     const token = url.searchParams.get("token")
+    const error = url.searchParams.get("error")
 
     if (token) {
       try {
-        // Trimitem token-ul la backend ca să fie pus în cookie
-        await fetch(`${API_BASE_URL}/api/auth/set-token`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/set-token`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
           credentials: "include",
         })
+        if (!res.ok) throw new Error("Failed to set token cookie")
       } catch (err) {
-        console.error("Failed to set cookie from token", err)
+        console.error(err)
       } finally {
-        // Scoatem ?token= din URL
         url.searchParams.delete("token")
         window.history.replaceState({}, document.title, url.toString())
       }
     }
 
-    // Acum verificăm sesiunea normal
+    if (error) {
+      console.error("Spotify login failed")
+      setShowLoginModal(true)
+      url.searchParams.delete("error")
+      window.history.replaceState({}, document.title, url.toString())
+      setLoading(false)
+      return
+    }
+
+    // Fetch current user session
     try {
       const response = await fetch(`${API_BASE_URL}/api/users/me`, {
         credentials: "include",
       })
-
       if (response.ok) {
         const userData = await response.json()
         setUser(userData)
       } else {
         setUser(null)
       }
-    } catch (error) {
+    } catch {
       setUser(null)
     } finally {
       setLoading(false)
@@ -67,6 +66,7 @@ useEffect(() => {
 
   finalizeLogin()
 }, [])
+
 
 
   const handleLogin = () => {
