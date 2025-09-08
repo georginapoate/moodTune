@@ -17,6 +17,15 @@ export default function Home() {
 useEffect(() => {
   const finalizeLogin = async () => {
     const url = new URL(window.location.href)
+    const error = url.searchParams.get("error")
+
+    if (error === "auth_failed") {
+      console.error("Spotify login failed. Please try again.")
+      setShowLoginModal(true)
+      url.searchParams.delete("error")
+      window.history.replaceState({}, document.title, url.toString())
+    }
+
     const token = url.searchParams.get("token")
 
     if (token) {
