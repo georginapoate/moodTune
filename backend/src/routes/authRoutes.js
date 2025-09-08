@@ -3,13 +3,15 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const { getPlayerToken } = require('../controllers/authController');
-const { spotifyLogin, spotifyCallback, refreshToken, logout } = require('../controllers/authController');
+const { spotifyLogin, spotifyCallback, setToken, refreshToken, logout } = require('../controllers/authController');
 require('../controllers/authController');
 
 router.get('/login', spotifyLogin);
 router.get('/callback', spotifyCallback);
 router.post('/refresh', refreshToken);
 router.post('/logout', logout);
+app.post("/set-token", setToken)
+
 
 router.get('/player-token', protect, getPlayerToken);
 

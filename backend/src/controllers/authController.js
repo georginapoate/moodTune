@@ -61,6 +61,22 @@ const refreshToken = async (req, res) => {
     }
 }
 
+const setToken = (req, res) => {
+  const { token } = req.body
+  if (!token) return res.status(400).json({ error: "Missing token" })
+
+  res.cookie("auth_token", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    domain: "povtunes.space",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  })
+
+  res.json({ success: true })
+}
+
+
 const spotifyCallback = async (req, res) => {
   const { code, state: stateParam } = req.query;
 
@@ -167,5 +183,6 @@ module.exports = {
     spotifyCallback,
     getPlayerToken,
     refreshToken,
+    setToken,
     logout
 };
