@@ -10,7 +10,7 @@ router.get('/login', spotifyLogin);
 router.get('/callback', spotifyCallback);
 router.post('/refresh', refreshToken);
 router.post('/logout', logout);
-app.post("/set-token", setToken)
+router.post("/set-token", setToken)
 
 
 router.get('/player-token', protect, getPlayerToken);
