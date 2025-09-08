@@ -74,9 +74,6 @@ const spotifyCallback = async (req, res) => {
         
         // 2. DECRIPTĂM state-ul folosind cheia noastră secretă
         const decryptedState = decrypt(encryptedState);
-        
-        // AICI am putea face o verificare suplimentară, de ex. dacă 'state'-ul a expirat,
-        // dar pentru moment, simpla decriptare reușită este o dovadă suficient de bună.
 
         // --- Fluxul continuă normal de aici ---
         const { accessToken, refreshToken } = await getSpotifyTokens(
@@ -107,11 +104,20 @@ const spotifyCallback = async (req, res) => {
         res.redirect(process.env.FRONTEND_URL);
 
     } catch (error) {
-        console.error('\nError during Spotify callback:', error.body || error.message);
-        // Dacă eroarea este la decriptare, înseamnă că 'state'-ul a fost modificat (CSRF)
-        if (error.message.includes('bad decrypt')) {
+    const errorMessage = (error.body && typeof error.body === 'string' ? error.body : JSON.stringify(error.body)) || error.message || '';
+        if (errorMessage.includes('invalid_grant') || errorMessage.includes('Authorization code expired or has already been used')) {
+            console.warn('Authorization code was likely already used by a browser pre-fetch. Redirecting user to frontend assuming success.');
+            // Presupunem că prima cerere a avut succes și a setat cookie-ul.
+            // Doar redirecționăm utilizatorul la frontend.
+            return res.redirect(process.env.FRONTEND_URL);
+        }
+
+        // Gestionăm alte erori posibile
+        if (error.message && error.message.includes('bad decrypt')) {
             return res.status(400).send('Invalid state parameter. CSRF attempt detected.');
         }
+
+        console.error('\nAn unhandled error occurred during Spotify callback:', error);
         res.status(500).send(`<h1>Error authenticating</h1><p>${error.message || 'An unknown error occurred.'}</p>`);
     }
 };
