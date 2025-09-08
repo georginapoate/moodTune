@@ -14,27 +14,51 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [currentView, setCurrentView] = useState("generator") // 'generator', 'profile'
 
-  useEffect(() => {
-    const checkUserSession = async () => {
+useEffect(() => {
+  const finalizeLogin = async () => {
+    const url = new URL(window.location.href)
+    const token = url.searchParams.get("token")
+
+    if (token) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+        // Trimitem token-ul la backend ca să fie pus în cookie
+        await fetch(`${API_BASE_URL}/api/auth/set-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
           credentials: "include",
         })
-
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
-        } else {
-          setUser(null)
-        }
-      } catch (error) {
-        setUser(null)
+      } catch (err) {
+        console.error("Failed to set cookie from token", err)
       } finally {
-        setLoading(false)
+        // Scoatem ?token= din URL
+        url.searchParams.delete("token")
+        window.history.replaceState({}, document.title, url.toString())
       }
     }
-    checkUserSession()
-  }, [])
+
+    // Acum verificăm sesiunea normal
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+        credentials: "include",
+      })
+
+      if (response.ok) {
+        const userData = await response.json()
+        setUser(userData)
+      } else {
+        setUser(null)
+      }
+    } catch (error) {
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  finalizeLogin()
+}, [])
+
 
   const handleLogin = () => {
     window.location.href = `${API_BASE_URL}/api/auth/login`
