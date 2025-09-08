@@ -118,7 +118,7 @@ const spotifyCallback = async (req, res) => {
         }
 
         console.error('\nAn unhandled error occurred during Spotify callback:', error);
-        res.status(500).send(`<h1>Error authenticating</h1><p>${error.message || 'An unknown error occurred.'}</p>`);
+        res.status(500).send(`<h1>Error authenticating</h1><p>${error.body || error.message || 'An unknown error occurred.'}</p>`);
     }
 };
 

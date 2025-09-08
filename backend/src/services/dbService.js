@@ -83,7 +83,7 @@ async function findOrCreateUser(spotifyProfile, tokens) {
     }
 
     const encryptedAccessToken = encrypt(tokens.accessToken);
-    const newEncryptedRefreshToken = tokens.refreshToken ? encrypt(tokens.refreshToken) : null;
+    const newEncryptedRefreshToken = tokens.refreshToken ? encrypt(tokens.refreshToken) : existingUser?.refreshToken || null;
 
     console.log(`Searching for user with Spotify ID: ${spotifyId}`);
     const existingUser = await usersCollection.findOne({ spotifyId: spotifyId });
