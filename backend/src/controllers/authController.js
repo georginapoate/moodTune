@@ -50,73 +50,77 @@ const refreshToken = async (req, res) => {
     }
 }
 
+// în backend/controllers/authController.js
+
 const spotifyCallback = async (req, res) => {
     const { code, state } = req.query;
-    // const storedState = req.cookies ? req.cookies['spotify_auth_state'] : null;
-    const storedState = req.session ? req.session.spotify_auth_state : null;
+    const storedState = req.session.spotify_auth_state;
 
-    if (state === null || state !== storedState) {
-        return res.status(400).send('State mismatch');
+    if (!state || state !== storedState) {
+        // Ștergem starea din sesiune pentru a curăța
+        if (req.session) {
+            req.session.spotify_auth_state = null;
+        }
+        return res.status(400).send('State mismatch error. Please try logging in again.');
     }
 
+    // Curățăm starea imediat după verificare
     req.session.spotify_auth_state = null;
-
-    // res.clearCookie('spotify_auth_state');
-
-    // if (!code) {
-    //     return res.status(400).send('Spotify authorization code is missing.');
-    // }
 
     try {
         console.log('\n--- Spotify Callback Received ---');
         const { accessToken, refreshToken } = await getSpotifyTokens(
-            code, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_CALLBACK_URL
-        )
+            code,
+            process.env.SPOTIFY_CLIENT_ID,
+            process.env.SPOTIFY_CLIENT_SECRET,
+            process.env.SPOTIFY_CALLBACK_URL
+        );
 
         const spotifyApi = getSpotifyApi(accessToken);
         const meResponse = await spotifyApi.getMe();
-        const spotifyProfile = await meResponse.body;
-
+        const spotifyProfile = meResponse.body;
         console.log('Successfully fetched Spotify profile:', spotifyProfile);
 
         const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
+        if (!user) {
+            throw new Error("Failed to find or create user in the database.");
+        }
+        console.log("User document received, proceeding to session regeneration.");
 
-        req.session.regenerate((err) => {
-            if (err) {
-                console.error("Session regeneration error:", err);
-                return res.status(500).send('Error during session setup.');
-            }
+        // Salvăm datele esențiale înainte de a regenera sesiunea
+        const userId = user._id.toString();
+        const spotifyId = user.spotifyId;
 
-            // --- TOATĂ LOGICA DE DUPĂ AUTENTIFICARE SE AFLĂ ACUM AICI ---
-            console.log("Session regenerated successfully. Creating JWT.");
-            const token = jwt.sign(
-                { userId: user._id.toString(), spotifyId: user.spotifyId },
-                process.env.JWT_SECRET,
-                { expiresIn: '7d' }
-            );
-
-            res.cookie('auth_token', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax', // Folosim 'lax' acum, este mai sigur
-                domain: 'povtunes.space', // Domeniul părinte
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 zile
+        // Promisify req.session.regenerate
+        await new Promise((resolve, reject) => {
+            req.session.regenerate((err) => {
+                if (err) {
+                    return reject(err);
+                }
+                resolve();
             });
-
-            // Redirecționăm la frontend DUPĂ ce totul a fost setat
-            const redirectUrl = process.env.FRONTEND_URL || 'http://127.0.0.1:3000/';
-            res.redirect(redirectUrl);
         });
 
+        console.log("Session regenerated successfully. Creating JWT.");
+        const token = jwt.sign(
+            { userId, spotifyId },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            domain: 'povtunes.space',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        res.redirect(process.env.FRONTEND_URL);
 
     } catch (error) {
-
-        console.error('\nError from Spotify API (body):', error.body);
-
-        res.status(500).send(`
-                <h1>Error authenticating</h1>
-                <p><b>Error from Spotify:</b> ${error.body ? JSON.stringify(error.body) : error.message}</p>
-            `);
+        console.error('\nError during Spotify callback:', error.body || error.message);
+        res.status(500).send(`<h1>Error authenticating</h1><p>${error.message || 'An unknown error occurred.'}</p>`);
     }
 };
 
