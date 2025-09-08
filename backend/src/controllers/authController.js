@@ -142,13 +142,11 @@ const spotifyCallback = async (req, res) => {
 
     console.error("❌ Spotify callback error:", {
       status: error.statusCode,
-      body: error.body,
+       body: error.body ? JSON.stringify(error.body, null, 2) : error.body,
       message: error.message,
     });
 
-    return res.status(500).send(
-      `<h1>Error authenticating</h1><pre>${errorMsg}</pre>`
-    );
+    return res.redirect(`${process.env.FRONTEND_URL}?error=auth_failed`);
   }
 };
 
