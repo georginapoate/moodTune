@@ -56,14 +56,18 @@ const spotifyCallback = async (req, res) => {
     const { code, state } = req.query;
     const storedState = req.session.spotify_auth_state;
 
-    if (!state || state !== storedState) {
+    if (!state || !storedState) {
         // Ștergem starea din sesiune pentru a curăța
-        if (req.session) {
-            req.session.spotify_auth_state = null;
-        }
+        // if (req.session) {
+        //     req.session.spotify_auth_state = null;
+        // }
         return res.status(400).send('State mismatch error. Please try logging in again.');
     }
 
+    if (state !== storedState) {
+        return res.status(400).send('State mismatch error. Possible CSRF attack. Please try again.');
+    }
+    
     // Curățăm starea imediat după verificare
     req.session.spotify_auth_state = null;
 
