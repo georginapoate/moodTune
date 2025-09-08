@@ -62,65 +62,80 @@ const refreshToken = async (req, res) => {
 }
 
 const spotifyCallback = async (req, res) => {
-    const { code, state: stateParam } = req.query;
+  const { code, state: stateParam } = req.query;
 
-    if (!stateParam) {
-        return res.status(400).send('State parameter is missing.');
+  if (!stateParam) {
+    return res.status(400).send('State parameter is missing.');
+  }
+
+  try {
+    // Decode & decrypt state
+    const encryptedState = JSON.parse(
+      Buffer.from(stateParam, 'base64').toString('ascii')
+    );
+    const decryptedState = decrypt(encryptedState);
+
+    // Exchange code for tokens
+    const { accessToken, refreshToken } = await getSpotifyTokens(
+      code,
+      process.env.SPOTIFY_CLIENT_ID,
+      process.env.SPOTIFY_CLIENT_SECRET,
+      process.env.SPOTIFY_CALLBACK_URL
+    );
+
+    // Get user profile
+    const spotifyApi = getSpotifyApi(accessToken);
+    const meResponse = await spotifyApi.getMe();
+    const spotifyProfile = meResponse.body;
+
+    // Create / update user in DB
+    const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
+    if (!user) throw new Error("Failed to find or create user.");
+
+    // JWT for our app
+    const token = jwt.sign(
+      { userId: user._id.toString(), spotifyId: user.spotifyId },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Set cookie
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      domain: 'povtunes.space',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // Redirect with token fallback (in case cookie was eaten by prefetch)
+    return res.redirect(`${process.env.FRONTEND_URL}?token=${token}`);
+  } catch (error) {
+    const errorBody = error.body || {};
+    const errorMsg = errorBody.error_description || error.message || "Unknown error";
+
+    // Handle double-usage of code (prefetch)
+    if (
+      errorMsg.includes('invalid_grant') ||
+      errorMsg.includes('Authorization code expired') ||
+      errorMsg.includes('already been used')
+    ) {
+      console.warn('⚠️ Code already used. Redirecting user to frontend assuming session is valid.');
+      return res.redirect(process.env.FRONTEND_URL);
     }
 
-    try {
-        // 1. Decodăm 'state'-ul primit de la Spotify
-        const encryptedState = JSON.parse(Buffer.from(stateParam, 'base64').toString('ascii'));
-        
-        // 2. DECRIPTĂM state-ul folosind cheia noastră secretă
-        const decryptedState = decrypt(encryptedState);
+    console.error("❌ Spotify callback error:", {
+      status: error.statusCode,
+      body: error.body,
+      message: error.message,
+    });
 
-        // --- Fluxul continuă normal de aici ---
-        const { accessToken, refreshToken } = await getSpotifyTokens(
-            code,
-            process.env.SPOTIFY_CLIENT_ID,
-            process.env.SPOTIFY_CLIENT_SECRET,
-            process.env.SPOTIFY_CALLBACK_URL
-        );
-        
-        const spotifyApi = getSpotifyApi(accessToken);
-        const meResponse = await spotifyApi.getMe();
-        const spotifyProfile = meResponse.body;
-        
-        const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
-        if (!user) throw new Error("Failed to find or create user.");
-        
-        const token = jwt.sign(
-            { userId: user._id.toString(), spotifyId: user.spotifyId },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        res.cookie('auth_token', token, {
-            httpOnly: true, secure: true, sameSite: 'none',
-            domain: 'povtunes.space', maxAge: 7 * 24 * 60 * 60 * 1000
-        });
-
-        res.redirect(process.env.FRONTEND_URL);
-
-    } catch (error) {
-    const errorMessage = (error.body && typeof error.body === 'string' ? error.body : JSON.stringify(error.body)) || error.message || '';
-        if (errorMessage.includes('invalid_grant') || errorMessage.includes('Authorization code expired or has already been used')) {
-            console.warn('Authorization code was likely already used by a browser pre-fetch. Redirecting user to frontend assuming success.');
-            // Presupunem că prima cerere a avut succes și a setat cookie-ul.
-            // Doar redirecționăm utilizatorul la frontend.
-            return res.redirect(process.env.FRONTEND_URL);
-        }
-
-        // Gestionăm alte erori posibile
-        if (error.message && error.message.includes('bad decrypt')) {
-            return res.status(400).send('Invalid state parameter. CSRF attempt detected.');
-        }
-
-        console.error('\nSpotify callback error:', error.body || error.message, error.stack);
-        res.status(500).send(`<h1>Error authenticating</h1><p>${JSON.stringify(error.body || error.message)}</p>`);
-    }
+    return res.status(500).send(
+      `<h1>Error authenticating</h1><pre>${errorMsg}</pre>`
+    );
+  }
 };
+
 
 const getPlayerToken = async (req, res) => {
     try {
