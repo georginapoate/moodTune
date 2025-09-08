@@ -30,11 +30,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET, // Adaugă o variabilă SESSION_SECRET în .env!
   resave: false,
   saveUninitialized: true,
-  cookie: { 
+  cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'lax', // Poți folosi 'lax' aici
-    domain: 'povtunes.space' // Opțional, dar bun pentru consistență
+    sameSite: 'none',
+    domain: 'povtunes.space', // Opțional, dar bun pentru consistență
+    maxAge: 7 * 24 * 60 * 60 * 1000
   }
 }));
 
@@ -65,7 +66,7 @@ const startServer = async () => {
     console.log("Connecting to the database...");
     await connectDB();
     console.log("Database connection successful. Starting Express server...");
-    
+
     app.listen(PORT, () => {
       console.log(`✅ Server is now listening on port ${PORT}`);
       console.log("Ready to accept requests.");
