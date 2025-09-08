@@ -62,7 +62,7 @@ export default function Home() {
           <div className="h-8 w-32 bg-white/10 rounded-lg animate-pulse"></div>
           <div className="w-12 h-12 bg-white/20 rounded-full animate-pulse"></div>
         </header>
-        
+
         {/* MainInterface fantomă */}
         <main className="min-h-screen flex items-center justify-center p-6">
           <div className="w-full max-w-4xl mx-auto space-y-8">

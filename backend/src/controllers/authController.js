@@ -2,7 +2,7 @@
 const SpotifyWebApi = require('spotify-web-api-node');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { findOrCreateUser, findUserById} = require('../services/dbService');
+const { findOrCreateUser, findUserById } = require('../services/dbService');
 const { getSpotifyApi } = require('../services/spotifyService');
 const { decrypt } = require('../../utils/crypto');
 
@@ -21,7 +21,7 @@ const {
 
 const spotifyLogin = (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
-    
+
     req.session.spotify_auth_state = state;
 
     // res.cookie('spotify_auth_state', state, { httpOnly: true});
@@ -58,11 +58,15 @@ const spotifyCallback = async (req, res) => {
     if (state === null || state !== storedState) {
         return res.status(400).send('State mismatch');
     }
-    res.clearCookie('spotify_auth_state');
 
-    if (!code) {
-        return res.status(400).send('Spotify authorization code is missing.');
-    }
+    req.session.spotify_auth_state = null;
+
+    // res.clearCookie('spotify_auth_state');
+
+    // if (!code) {
+    //     return res.status(400).send('Spotify authorization code is missing.');
+    // }
+
     try {
         console.log('\n--- Spotify Callback Received ---');
         const { accessToken, refreshToken } = await getSpotifyTokens(
@@ -70,33 +74,39 @@ const spotifyCallback = async (req, res) => {
         )
 
         const spotifyApi = getSpotifyApi(accessToken);
-
         const meResponse = await spotifyApi.getMe();
         const spotifyProfile = await meResponse.body;
 
         console.log('Successfully fetched Spotify profile:', spotifyProfile);
 
         const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
-        console.log("User document received in controller:", user);
-        if (!user) {
-            throw new Error("Failed to find or create user in the database.");
-        }
 
+        req.session.regenerate((err) => {
+            if (err) {
+                console.error("Session regeneration error:", err);
+                return res.status(500).send('Error during session setup.');
+            }
 
-        const token = jwt.sign(
-            { userId: user._id.toString(), spotifyId: user.spotifyId },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
+            // --- TOATĂ LOGICA DE DUPĂ AUTENTIFICARE SE AFLĂ ACUM AICI ---
+            console.log("Session regenerated successfully. Creating JWT.");
+            const token = jwt.sign(
+                { userId: user._id.toString(), spotifyId: user.spotifyId },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d' }
+            );
 
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'none',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+            res.cookie('auth_token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax', // Folosim 'lax' acum, este mai sigur
+                domain: 'povtunes.space', // Domeniul părinte
+                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 zile
+            });
+
+            // Redirecționăm la frontend DUPĂ ce totul a fost setat
+            res.redirect(process.env.FRONTEND_URL) || `http://127.0.0.1:3000/`;
         });
-        
-        res.redirect(process.env.FRONTEND_URL || `http://127.0.0.1:3000/`);
+
 
     } catch (error) {
 
@@ -110,22 +120,35 @@ const spotifyCallback = async (req, res) => {
 };
 
 const getPlayerToken = async (req, res) => {
-  try {
-    const user = await findUserById(req.userId); // req.userId comes from our 'protect' middleware
-    if (!user || !user.accessToken) {
-      return res.status(404).json({ message: 'User or token not found' });
+    try {
+        const user = await findUserById(req.userId); // req.userId comes from our 'protect' middleware
+        if (!user || !user.accessToken) {
+            return res.status(404).json({ message: 'User or token not found' });
+        }
+        const accessToken = decrypt(user.accessToken);
+        res.json({ accessToken });
+    } catch (error) {
+        console.error("Error fetching player token:", error);
+        res.status(500).json({ message: 'Server error' });
     }
-    const accessToken = decrypt(user.accessToken);
-    res.json({ accessToken });
-  } catch (error) {
-    console.error("Error fetching player token:", error);
-    res.status(500).json({ message: 'Server error' });
-  }
+};
+
+const logout = (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error("Error destroying session:", err);
+            return res.status(500).json({ message: 'Server error' });
+        }
+        res.clearCookie('auth_token', { domain: 'povtunes.space' });
+        res.clearCookie('connect.sid', { domain: 'povtunes.space' });
+        res.status(200).json({ message: 'Logged out successfully' });
+    });
 };
 
 module.exports = {
     spotifyLogin,
     spotifyCallback,
     getPlayerToken,
-    refreshToken
+    refreshToken,
+    logout
 };
