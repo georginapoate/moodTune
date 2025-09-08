@@ -6,6 +6,7 @@ require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const MongoStore = require('connect-mongo');
 const { connectDB } = require('./src/db/connection');
 const session = require('express-session');
 
@@ -13,8 +14,6 @@ const session = require('express-session');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// --- MIDDLEWARE SETUP ---
-// This middleware runs for every request and is great for debugging
 app.use((req, res, next) => {
   console.log(`\n--- Request: ${req.method} ${req.originalUrl} ---`);
   next();
@@ -26,12 +25,22 @@ app.use(cors({
   credentials: true,
 }));
 
+const mongoUrl = process.env.MONGO_URI;
+if (!mongoUrl) {
+  throw new Error("❌ FATAL: MONGO_URI is not defined in environment variables.");
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET, // Adaugă o variabilă SESSION_SECRET în .env!
   resave: false,
   saveUninitialized: true,
+  store: MongoStore.create({
+    mongoUrl,
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60 // 14 days
+  }),
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     httpOnly: true,
     sameSite: 'none',
     domain: 'povtunes.space', // Opțional, dar bun pentru consistență

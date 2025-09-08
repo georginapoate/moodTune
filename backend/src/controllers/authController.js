@@ -104,7 +104,8 @@ const spotifyCallback = async (req, res) => {
             });
 
             // Redirecționăm la frontend DUPĂ ce totul a fost setat
-            res.redirect(process.env.FRONTEND_URL) || `http://127.0.0.1:3000/`;
+            const redirectUrl = process.env.FRONTEND_URL || 'http://127.0.0.1:3000/';
+            res.redirect(redirectUrl);
         });
 
 
