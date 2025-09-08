@@ -21,12 +21,19 @@ const {
 
 const spotifyLogin = (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
+    
+    // Setăm 'state' într-un cookie semnat și httpOnly
+    res.cookie('spotify_auth_state', state, { 
+        httpOnly: true, 
+        signed: true, // Asta îi spune lui cookieParser să-l semneze
+        secure: true, 
+        sameSite: 'none', 
+        domain: 'povtunes.space'
+    });
 
-    req.session.spotify_auth_state = state;
-
-    // res.cookie('spotify_auth_state', state, { httpOnly: true});
-    const authorizeURL = createSpotifyAuthorizeURL(SPOTIFY_CLIENT_ID, SPOTIFY_CALLBACK_URL, scopes, state);
+    const authorizeURL = createSpotifyAuthorizeURL(process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CALLBACK_URL, scopes, state);
     res.redirect(authorizeURL);
+
 };
 
 const refreshToken = async (req, res) => {
@@ -50,74 +57,38 @@ const refreshToken = async (req, res) => {
     }
 }
 
-// în backend/controllers/authController.js
-
 const spotifyCallback = async (req, res) => {
     const { code, state } = req.query;
-    const storedState = req.session.spotify_auth_state;
+    // Citim 'state' din cookie-urile SEMNATE.
+    const storedState = req.signedCookies ? req.signedCookies['spotify_auth_state'] : null;
 
-    if (!state || !storedState) {
-        // Ștergem starea din sesiune pentru a curăța
-        // if (req.session) {
-        //     req.session.spotify_auth_state = null;
-        // }
+    if (!state || state !== storedState) {
+        // Dacă eșuează, ștergem cookie-ul pentru a curăța
+        res.clearCookie('spotify_auth_state', { domain: 'povtunes.space' });
         return res.status(400).send('State mismatch error. Please try logging in again.');
     }
 
-    if (state !== storedState) {
-        return res.status(400).send('State mismatch error. Possible CSRF attack. Please try again.');
-    }
-    
-    // Curățăm starea imediat după verificare
-    req.session.spotify_auth_state = null;
+    // Curățăm cookie-ul, nu mai este necesar
+    res.clearCookie('spotify_auth_state', { domain: 'povtunes.space' });
 
     try {
-        console.log('\n--- Spotify Callback Received ---');
-        const { accessToken, refreshToken } = await getSpotifyTokens(
-            code,
-            process.env.SPOTIFY_CLIENT_ID,
-            process.env.SPOTIFY_CLIENT_SECRET,
-            process.env.SPOTIFY_CALLBACK_URL
-        );
-
+        const { accessToken, refreshToken } = await getSpotifyTokens(/* ... */);
         const spotifyApi = getSpotifyApi(accessToken);
         const meResponse = await spotifyApi.getMe();
         const spotifyProfile = meResponse.body;
-        console.log('Successfully fetched Spotify profile:', spotifyProfile);
-
+        
         const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
-        if (!user) {
-            throw new Error("Failed to find or create user in the database.");
-        }
-        console.log("User document received, proceeding to session regeneration.");
-
-        // Salvăm datele esențiale înainte de a regenera sesiunea
-        const userId = user._id.toString();
-        const spotifyId = user.spotifyId;
-
-        // Promisify req.session.regenerate
-        await new Promise((resolve, reject) => {
-            req.session.regenerate((err) => {
-                if (err) {
-                    return reject(err);
-                }
-                resolve();
-            });
-        });
-
-        console.log("Session regenerated successfully. Creating JWT.");
+        if (!user) throw new Error("Failed to find or create user.");
+        
         const token = jwt.sign(
-            { userId, spotifyId },
+            { userId: user._.toString(), spotifyId: user.spotifyId },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
         res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            domain: 'povtunes.space',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            httpOnly: true, secure: true, sameSite: 'none',
+            domain: 'povtunes.space', maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
         res.redirect(process.env.FRONTEND_URL);
@@ -149,7 +120,6 @@ const logout = (req, res) => {
             return res.status(500).json({ message: 'Server error' });
         }
         res.clearCookie('auth_token', { domain: 'povtunes.space' });
-        res.clearCookie('connect.sid', { domain: 'povtunes.space' });
         res.status(200).json({ message: 'Logged out successfully' });
     });
 };

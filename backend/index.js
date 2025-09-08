@@ -8,16 +8,15 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const MongoStore = require('connect-mongo');
 const { connectDB } = require('./src/db/connection');
-const session = require('express-session');
+// const session = require('express-session');
 
-// --- APP INITIALIZATION ---
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use((req, res, next) => {
-  console.log(`\n--- Request: ${req.method} ${req.originalUrl} ---`);
-  next();
-});
+// app.use((req, res, next) => {
+//   console.log(`\n--- Request: ${req.method} ${req.originalUrl} ---`);
+//   next();
+// });
 
 // Configure CORS to allow requests from your frontend
 app.use(cors({
@@ -25,7 +24,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(cookieParser());
+app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(express.json({ limit: '50mb' }));
 
 const mongoUrl = process.env.MONGO_URI;
