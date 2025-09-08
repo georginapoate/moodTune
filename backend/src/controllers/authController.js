@@ -22,18 +22,18 @@ const {
 const spotifyLogin = (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
     
-    // Setăm 'state' într-un cookie semnat și httpOnly
+    // Setăm 'state' într-un cookie semnat și securizat
     res.cookie('spotify_auth_state', state, { 
         httpOnly: true, 
-        signed: true, // Asta îi spune lui cookieParser să-l semneze
+        signed: true, // Îi spune lui cookieParser să-l semneze
         secure: true, 
         sameSite: 'none', 
-        domain: 'povtunes.space'
+        domain: 'povtunes.space',
+        maxAge: 5 * 60 * 1000 // Valabil 5 minute
     });
 
     const authorizeURL = createSpotifyAuthorizeURL(process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CALLBACK_URL, scopes, state);
     res.redirect(authorizeURL);
-
 };
 
 const refreshToken = async (req, res) => {
@@ -58,39 +58,60 @@ const refreshToken = async (req, res) => {
 }
 
 const spotifyCallback = async (req, res) => {
+    // 1. Extragem 'code' și 'state' din URL-ul de la Spotify
     const { code, state } = req.query;
-    // Citim 'state' din cookie-urile SEMNATE.
+
+    // 2. Extragem 'state'-ul stocat anterior din cookie-urile SEMNATE
+    //    'req.signedCookies' este disponibil datorită `cookieParser(secret)` din index.js
     const storedState = req.signedCookies ? req.signedCookies['spotify_auth_state'] : null;
 
-    if (!state || state !== storedState) {
-        // Dacă eșuează, ștergem cookie-ul pentru a curăța
+    // 3. Verificarea de securitate. Comparam cele două valori.
+    if (!state || !storedState || state !== storedState) {
+        // Dacă nu se potrivesc, ștergem cookie-ul invalid și returnăm o eroare.
         res.clearCookie('spotify_auth_state', { domain: 'povtunes.space' });
         return res.status(400).send('State mismatch error. Please try logging in again.');
     }
 
-    // Curățăm cookie-ul, nu mai este necesar
+    // 4. Dacă verificarea a trecut, ștergem cookie-ul temporar. Nu mai este necesar.
     res.clearCookie('spotify_auth_state', { domain: 'povtunes.space' });
 
     try {
-        const { accessToken, refreshToken } = await getSpotifyTokens(/* ... */);
+        // 5. Schimbăm 'authorization_code' pentru token-uri de acces
+        const { accessToken, refreshToken } = await getSpotifyTokens(
+            code,
+            process.env.SPOTIFY_CLIENT_ID,
+            process.env.SPOTIFY_CLIENT_SECRET,
+            process.env.SPOTIFY_CALLBACK_URL
+        );
+        
+        // 6. Obținem profilul utilizatorului de la Spotify
         const spotifyApi = getSpotifyApi(accessToken);
         const meResponse = await spotifyApi.getMe();
         const spotifyProfile = meResponse.body;
         
+        // 7. Salvăm sau actualizăm utilizatorul în baza noastră de date
         const user = await findOrCreateUser(spotifyProfile, { accessToken, refreshToken });
-        if (!user) throw new Error("Failed to find or create user.");
+        if (!user) {
+            throw new Error("Failed to find or create user in the database.");
+        }
         
+        // 8. Creăm JWT-ul nostru intern pentru a gestiona sesiunea
         const token = jwt.sign(
-            { userId: user._.toString(), spotifyId: user.spotifyId },
+            { userId: user._id.toString(), spotifyId: user.spotifyId },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
+        // 9. Setăm JWT-ul într-un cookie securizat
         res.cookie('auth_token', token, {
-            httpOnly: true, secure: true, sameSite: 'none',
-            domain: 'povtunes.space', maxAge: 7 * 24 * 60 * 60 * 1000
+            httpOnly: true, 
+            secure: true, 
+            sameSite: 'none',
+            domain: 'povtunes.space', 
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
+        // 10. Redirecționăm utilizatorul înapoi la frontend
         res.redirect(process.env.FRONTEND_URL);
 
     } catch (error) {
