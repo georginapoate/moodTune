@@ -135,14 +135,14 @@ const getPlayerToken = async (req, res) => {
 };
 
 const logout = (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            console.error("Error destroying session:", err);
-            return res.status(500).json({ message: 'Server error' });
-        }
-        res.clearCookie('auth_token', { domain: 'povtunes.space' });
-        res.status(200).json({ message: 'Logged out successfully' });
+    res.clearCookie('auth_token', { 
+        domain: 'povtunes.space',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
     });
+
+    res.status(200).json({ message: 'Logged out successfully' });
 };
 
 module.exports = {
