@@ -117,8 +117,8 @@ const spotifyCallback = async (req, res) => {
             return res.status(400).send('Invalid state parameter. CSRF attempt detected.');
         }
 
-        console.error('\nAn unhandled error occurred during Spotify callback:', error);
-        res.status(500).send(`<h1>Error authenticating</h1><p>${error.body || error.message || 'An unknown error occurred.'}</p>`);
+        console.error('\nSpotify callback error:', error.body || error.message, error.stack);
+        res.status(500).send(`<h1>Error authenticating</h1><p>${JSON.stringify(error.body || error.message)}</p>`);
     }
 };
 
